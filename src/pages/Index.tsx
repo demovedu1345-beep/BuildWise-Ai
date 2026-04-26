@@ -1,16 +1,67 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useEffect, useMemo, useState } from "react";
+import { Navbar } from "@/components/buildwise/Navbar";
+import { HeroPlanner } from "@/components/buildwise/HeroPlanner";
+import { Dashboard } from "@/components/buildwise/Dashboard";
+import { Loader } from "@/components/buildwise/Loader";
+import { generatePlan, Goal } from "@/lib/buildwise";
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const Index = () => {
+  const [budget, setBudget] = useState(7500000);
+  const [cityId, setCityId] = useState("bangalore");
+  const [plotSqft, setPlotSqft] = useState(1200);
+  const [goal, setGoal] = useState<Goal>("family");
+
+  const [planVisible, setPlanVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    document.title = "BuildWise AI — Turn Your Budget Into a Smart Home Plan";
+    const meta = document.querySelector('meta[name="description"]') ?? document.createElement("meta");
+    meta.setAttribute("name", "description");
+    meta.setAttribute(
+      "content",
+      "AI-powered home construction planning. Cost estimation, smart recommendations, floor plans and 3D visualization in one premium platform."
+    );
+    document.head.appendChild(meta);
+  }, []);
+
+  const plan = useMemo(
+    () => generatePlan({ budget, cityId, plotSqft, goal }),
+    [budget, cityId, plotSqft, goal]
+  );
+
+  const handleGenerate = () => {
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      setPlanVisible(true);
+      setTimeout(() => {
+        document.getElementById("dashboard")?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    }, 1800);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
-    </div>
+    <main className="relative min-h-screen overflow-x-hidden">
+      <Navbar />
+      <HeroPlanner
+        budget={budget} setBudget={setBudget}
+        cityId={cityId} setCityId={setCityId}
+        plotSqft={plotSqft} setPlotSqft={setPlotSqft}
+        goal={goal} setGoal={setGoal}
+        onGenerate={handleGenerate} loading={loading}
+      />
+      {planVisible && <Dashboard plan={plan} />}
+      {loading && <Loader />}
+
+      <footer className="border-t border-border/50 py-8 mt-12">
+        <div className="container mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
+          <p>© 2026 BuildWise AI · Designed for the future of home building.</p>
+          <p>Crafted with intelligence, in India.</p>
+        </div>
+      </footer>
+    </main>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;
