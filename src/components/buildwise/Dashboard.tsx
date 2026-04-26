@@ -1,0 +1,229 @@
+import { motion } from "framer-motion";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { AlertTriangle, Lightbulb, MapPin, Layers, Box, Wrench, TrendingDown, Check } from "lucide-react";
+import { Plan, fmtINR } from "@/lib/buildwise";
+import { HouseModel } from "./HouseModel";
+
+interface Props { plan: Plan; }
+
+const card = "glass rounded-3xl p-6 md:p-7 hover-lift";
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 20 },
+  show: (i: number) => ({ opacity: 1, y: 0, transition: { duration: 0.5, delay: i * 0.06 } }),
+};
+
+export const Dashboard = ({ plan }: Props) => {
+  return (
+    <section id="dashboard" className="relative py-20 md:py-28">
+      <div className="container mx-auto px-6">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="max-w-3xl mb-12"
+        >
+          <p className="text-xs uppercase tracking-[0.3em] text-accent mb-3">Your Plan</p>
+          <h2 className="font-display text-4xl md:text-5xl font-semibold tracking-tight">
+            A <span className="text-gradient-hero">{plan.bhk}BHK</span> in {plan.city.name},
+            <br />engineered to your budget.
+          </h2>
+          <p className="text-muted-foreground mt-4 text-lg">
+            {plan.buildableSqft.toLocaleString("en-IN")} sqft · {fmtINR(plan.ratePerSqft)}/sqft · {plan.goal.label}
+          </p>
+        </motion.div>
+
+        {/* Warnings */}
+        {plan.warnings.map((w, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mb-6 glass rounded-2xl p-5 border border-warning/30 flex gap-4"
+            style={{ background: "linear-gradient(145deg, hsl(35 95% 50% / 0.08), hsl(0 75% 50% / 0.05))" }}
+          >
+            <div className="w-10 h-10 rounded-xl bg-warning/15 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5 text-warning" />
+            </div>
+            <div>
+              <p className="font-medium text-warning mb-1">Reality check</p>
+              <p className="text-sm text-muted-foreground">{w}</p>
+            </div>
+          </motion.div>
+        ))}
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Budget breakdown */}
+          <motion.div custom={0} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className={card}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-lg">Budget Breakdown</h3>
+              <Layers className="w-5 h-5 text-primary" />
+            </div>
+            <div className="h-52 relative">
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie
+                    data={plan.breakdown}
+                    innerRadius={62}
+                    outerRadius={88}
+                    paddingAngle={3}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {plan.breakdown.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-xs text-muted-foreground tracking-wider">TOTAL</span>
+                <span className="font-display text-2xl text-gradient-gold mt-0.5">{fmtINR(plan.totalBudget)}</span>
+              </div>
+            </div>
+            <div className="space-y-2 mt-4">
+              {plan.breakdown.map((d) => (
+                <div key={d.name} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-sm" style={{ background: d.color }} />
+                    <span className="text-muted-foreground">{d.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground">{d.pct}%</span>
+                    <span className="font-medium">{fmtINR(d.value)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Smart recommendations */}
+          <motion.div custom={1} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className={card}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-lg">Smart Recommendations</h3>
+              <Lightbulb className="w-5 h-5 text-accent" />
+            </div>
+            <ul className="space-y-3">
+              {plan.recommendations.map((r, i) => (
+                <li key={i} className="flex gap-3 p-3 rounded-xl bg-secondary/40 border border-border/50">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-gold/20 flex items-center justify-center shrink-0 mt-0.5">
+                    <Check className="w-3.5 h-3.5 text-accent" />
+                  </div>
+                  <p className="text-sm leading-relaxed text-foreground/90">{r}</p>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+
+          {/* Locations */}
+          <motion.div custom={2} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className={card}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-lg">Location Suggestions</h3>
+              <MapPin className="w-5 h-5 text-primary" />
+            </div>
+            <div className="space-y-3">
+              {plan.locations.map((loc) => {
+                const tone =
+                  loc.fit === "good" ? "text-primary border-primary/30 bg-primary/10"
+                  : loc.fit === "tight" ? "text-warning border-warning/30 bg-warning/10"
+                  : "text-destructive border-destructive/30 bg-destructive/10";
+                const label = loc.fit === "good" ? "Fits budget" : loc.fit === "tight" ? "Tight fit" : "Over budget";
+                return (
+                  <div key={loc.area} className="p-4 rounded-xl bg-secondary/40 border border-border/50">
+                    <div className="flex justify-between items-start mb-2">
+                      <p className="font-medium">{loc.area}</p>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${tone}`}>{label}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Avg <span className="text-foreground font-medium">{fmtINR(loc.pricePerSqft)}</span>/sqft
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+
+          {/* Floor plan */}
+          <motion.div custom={3} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className={`${card} lg:col-span-1`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-lg">Floor Plan</h3>
+              <span className="text-xs text-muted-foreground">{plan.bhk}BHK · 2D</span>
+            </div>
+            <div className="relative aspect-[10/7] rounded-2xl bg-background/60 border border-border overflow-hidden">
+              <div className="absolute inset-0 grid-bg opacity-40" />
+              {plan.rooms.map((r, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.07, duration: 0.4 }}
+                  className="absolute rounded-lg border border-primary/30 flex items-center justify-center text-[10px] md:text-xs font-medium text-foreground/80 backdrop-blur-sm"
+                  style={{
+                    left: `${r.x}%`, top: `${r.y}%`,
+                    width: `${r.w}%`, height: `${r.h}%`,
+                    background: r.color,
+                  }}
+                >
+                  {r.name}
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* 3D model — span 2 */}
+          <motion.div custom={4} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className={`${card} lg:col-span-2`}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-display text-lg flex items-center gap-2">
+                  <Box className="w-5 h-5 text-primary" /> 3D Visualization
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">Drag to orbit · scroll to zoom</p>
+              </div>
+              <div className="text-xs text-muted-foreground">Live · WebGL</div>
+            </div>
+            <div className="relative aspect-[16/9] rounded-2xl overflow-hidden border border-border">
+              <HouseModel bhk={plan.bhk} sqft={plan.buildableSqft} />
+              <div className="absolute top-3 left-3 glass-strong rounded-lg px-3 py-1.5 text-xs">
+                {plan.bhk}BHK · {plan.buildableSqft.toLocaleString("en-IN")} sqft
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Materials optimization */}
+          <motion.div custom={5} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className={`${card} lg:col-span-3`}>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="font-display text-lg flex items-center gap-2">
+                  <Wrench className="w-5 h-5 text-accent" /> Material Optimization
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">Smart swaps to stretch your budget further</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Total potential savings</p>
+                <p className="font-display text-2xl text-gradient-gold">
+                  {fmtINR(plan.materials.reduce((s, m) => s + m.saves, 0))}
+                </p>
+              </div>
+            </div>
+            <div className="grid md:grid-cols-3 gap-4">
+              {plan.materials.map((m) => (
+                <div key={m.item} className="p-5 rounded-2xl bg-secondary/40 border border-border/50 hover-lift">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">{m.item}</p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="line-through text-muted-foreground">{m.from}</span>
+                    <span>→</span>
+                    <span className="font-medium text-foreground">{m.to}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-4 text-accent">
+                    <TrendingDown className="w-4 h-4" />
+                    <span className="font-display text-lg">Save {fmtINR(m.saves)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+};
