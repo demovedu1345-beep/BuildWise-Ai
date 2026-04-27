@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { AlertTriangle, Lightbulb, MapPin, Layers, Box, Wrench, TrendingDown, Check } from "lucide-react";
+import { AlertTriangle, Lightbulb, MapPin, Layers, Box, Wrench, TrendingDown, Check, Sparkles } from "lucide-react";
 import { Plan, fmtINR } from "@/lib/buildwise";
+import { suggestAreas } from "@/lib/locations";
 import { HouseModel } from "./HouseModel";
 
 interface Props { plan: Plan; }
