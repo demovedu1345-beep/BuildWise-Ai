@@ -151,10 +151,10 @@ export const HeroPlanner = ({
                     <button
                       key={g.id}
                       onClick={() => setGoal(g.id)}
-                      className={`relative px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                      className={`press relative px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-300 ${
                         goal === g.id
-                          ? "bg-gradient-primary text-primary-foreground shadow-[0_0_25px_hsl(205_100%_60%/0.4)]"
-                          : "bg-input/40 border border-border hover:border-primary/40 text-muted-foreground"
+                          ? "bg-primary/15 text-primary border border-primary/40 shadow-[0_0_20px_hsl(210_90%_62%/0.18)]"
+                          : "bg-input/40 border border-border hover:border-primary/30 hover:text-foreground text-muted-foreground"
                       }`}
                     >
                       {g.label}
@@ -166,11 +166,11 @@ export const HeroPlanner = ({
               <Button
                 onClick={onGenerate}
                 disabled={loading}
-                className="mt-7 w-full h-14 text-base font-medium bg-gradient-hero hover:opacity-90 transition-all rounded-2xl group relative overflow-hidden glow-blue"
+                className="press mt-7 w-full h-14 text-base font-medium bg-primary hover:bg-primary/90 text-primary-foreground transition-all rounded-2xl group relative overflow-hidden glow-blue"
               >
                 <span className="relative z-10 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 transition-transform group-hover:rotate-12" />
-                  {loading ? "AI is designing your home..." : "Generate My Plan"}
+                  {loading ? "Designing your home…" : "Design My Home"}
                 </span>
               </Button>
             </div>

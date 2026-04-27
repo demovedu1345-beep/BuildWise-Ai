@@ -304,10 +304,10 @@ const Field = ({ label, children }: { label: React.ReactNode; children: React.Re
 const PillBtn = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
   <button
     onClick={onClick}
-    className={`px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
+    className={`press px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-300 ${
       active
-        ? "bg-gradient-primary text-primary-foreground shadow-[0_0_20px_hsl(205_100%_60%/0.35)]"
-        : "bg-input/40 border border-border hover:border-primary/40 text-muted-foreground"
+        ? "bg-primary/15 text-primary border border-primary/40 shadow-[0_0_20px_hsl(210_90%_62%/0.18)]"
+        : "bg-input/40 border border-border hover:border-primary/30 hover:text-foreground text-muted-foreground"
     }`}
   >
     {children}
