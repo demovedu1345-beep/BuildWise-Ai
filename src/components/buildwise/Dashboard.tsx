@@ -116,10 +116,10 @@ export const Dashboard = ({ plan }: Props) => {
             </ul>
           </motion.div>
 
-          {/* Locations */}
+          {/* Quick locations summary */}
           <motion.div custom={2} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className={card}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display text-lg">Location Suggestions</h3>
+              <h3 className="font-display text-lg">Top Areas Snapshot</h3>
               <MapPin className="w-5 h-5 text-primary" />
             </div>
             <div className="space-y-3">
@@ -141,6 +141,7 @@ export const Dashboard = ({ plan }: Props) => {
                   </div>
                 );
               })}
+              <p className="text-[11px] text-muted-foreground pt-1">See detailed areas below ↓</p>
             </div>
           </motion.div>
 
