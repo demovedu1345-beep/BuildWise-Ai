@@ -92,14 +92,14 @@ export const Studio3D = () => {
           transition={{ duration: 0.6 }}
           className="max-w-3xl mb-10"
         >
-          <p className="text-xs uppercase tracking-[0.3em] text-accent mb-3">3D Interior Studio</p>
-          <h2 className="font-display text-4xl md:text-5xl font-semibold tracking-tight">
+          <p className="text-[11px] uppercase tracking-[0.32em] text-muted-foreground mb-4">3D Interior Studio</p>
+          <h2 className="font-display text-4xl md:text-6xl font-semibold tracking-tight leading-[1.05]">
             Walk through your room.
             <br />
-            <span className="text-gradient-hero">Click any object to buy it.</span>
+            <span className="text-primary">Buy what you love.</span>
           </h2>
-          <p className="text-muted-foreground mt-4 text-lg">
-            A real-time 3D AI designer — every chair, lamp and tile is placed intelligently, priced, and linked to a real product page.
+          <p className="text-muted-foreground mt-5 text-lg max-w-xl">
+            A real-time 3D AI designer. Every chair, lamp and tile is placed intelligently, priced, and linked to a real product.
           </p>
         </motion.div>
 
@@ -239,101 +239,70 @@ export const Studio3D = () => {
               </div>
             </div>
 
-            {/* 3D scene + inspector */}
-            <div className="grid lg:grid-cols-[1fr_320px] gap-4">
-              <div className="glass rounded-3xl overflow-hidden border border-border/50 relative aspect-[4/3] lg:aspect-auto lg:min-h-[520px]">
-                <RoomScene
-                  plan={plan}
-                  hoveredId={hoveredId}
-                  selectedId={selectedId}
-                  onHover={setHoveredId}
-                  onSelect={setSelectedId}
-                  night={night}
-                />
-                <div className="absolute top-3 left-3 glass-strong rounded-lg px-3 py-1.5 text-xs flex items-center gap-2">
+            {/* 3D scene — full width, with Focus Mode + sliding right product panel */}
+            <div
+              className={
+                focus
+                  ? "fixed inset-0 z-50 bg-background"
+                  : "glass rounded-3xl overflow-hidden border border-border/50 relative aspect-[16/10] lg:min-h-[560px]"
+              }
+            >
+              <RoomScene
+                plan={plan}
+                hoveredId={hoveredId}
+                selectedId={selectedId}
+                onHover={setHoveredId}
+                onSelect={setSelectedId}
+                night={night}
+              />
+
+              {/* Top-left: live tag (hidden in focus when nothing selected) */}
+              {!focus && (
+                <div className="absolute top-3 left-3 glass-strong rounded-full px-3 py-1.5 text-[11px] flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-glow" />
                   Live · {plan.input.room} · {plan.input.style}
                 </div>
-                {hoveredId && !selectedId && (
-                  <div className="absolute bottom-3 left-3 glass-strong rounded-lg px-3 py-1.5 text-xs">
-                    {plan.items.find((i) => i.id === hoveredId)?.name}
-                  </div>
-                )}
+              )}
+
+              {/* Top-right: focus toggle + day/night */}
+              <div className="absolute top-3 right-3 flex items-center gap-2">
+                <button
+                  onClick={() => setNight((v) => !v)}
+                  aria-label="Toggle lighting"
+                  className="w-9 h-9 rounded-xl glass-strong flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors press"
+                >
+                  {night ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={() => setFocus((v) => !v)}
+                  aria-label="Toggle focus mode"
+                  className="h-9 px-3 rounded-xl glass-strong flex items-center gap-2 text-xs text-foreground/85 hover:text-foreground transition-colors press"
+                >
+                  {focus ? <Minimize className="w-3.5 h-3.5" /> : <Expand className="w-3.5 h-3.5" />}
+                  {focus ? "Exit Focus" : "Focus Mode"}
+                </button>
               </div>
 
-              {/* Inspector */}
-              <div className="glass rounded-3xl p-5 min-h-[280px] flex flex-col">
-                <AnimatePresence mode="wait">
-                  {selected ? (
-                    <motion.div
-                      key={selected.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="flex flex-col h-full"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wider text-accent">{selected.category}</p>
-                          <h4 className="font-display text-lg leading-tight mt-0.5">{selected.name}</h4>
-                        </div>
-                        <button
-                          onClick={() => setSelectedId(null)}
-                          className="w-7 h-7 rounded-lg bg-secondary/60 hover:bg-secondary flex items-center justify-center text-muted-foreground"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
+              {/* Bottom-left: hover label */}
+              {hoveredId && !selectedId && (
+                <div className="absolute bottom-4 left-4 glass-strong rounded-full px-3 py-1.5 text-xs animate-fade-in">
+                  {plan.items.find((i) => i.id === hoveredId)?.name}
+                </div>
+              )}
 
-                      <div className="space-y-2 text-sm">
-                        <Row label="Material" value={selected.material} />
-                        <Row label="Dimensions" value={selected.dimensions} />
-                        <Row label="Quantity" value={`${selected.qty}${selected.unit ? ` ${selected.unit}` : ""}`} />
-                        <Row label="Retailer" value={selected.retailer} />
-                      </div>
+              {/* Focus Mode hint */}
+              {focus && !selected && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 glass-strong rounded-full px-4 py-2 text-xs text-muted-foreground animate-fade-in">
+                  Drag to orbit · click any object · ESC to exit
+                </div>
+              )}
 
-                      <div className="mt-4 p-4 rounded-2xl bg-secondary/40 border border-border/50">
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total cost</p>
-                        <p className="font-display text-3xl text-gradient-gold mt-0.5">{fmtINR(selected.cost)}</p>
-                      </div>
-
-                      <a
-                        href={selected.buyUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-4 w-full inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-gradient-hero text-primary-foreground font-medium glow-blue hover:opacity-95 transition"
-                      >
-                        Buy Now <ExternalLink className="w-4 h-4" />
-                      </a>
-
-                      {selected.alternative && (
-                        <a
-                          href={selected.alternative.buyUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 text-xs text-accent flex items-center justify-center gap-1.5 hover:underline"
-                        >
-                          <TrendingDown className="w-3 h-3" />
-                          Cheaper alternative: {selected.alternative.name} (save ₹{selected.alternative.saves.toLocaleString("en-IN")})
-                        </a>
-                      )}
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="empty"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="flex flex-col items-center justify-center text-center h-full text-muted-foreground"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center mb-3">
-                        <Sparkles className="w-5 h-5 text-primary" />
-                      </div>
-                      <p className="text-sm">Click any object in the 3D scene to inspect details, see the price and buy it.</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+              {/* Sliding right-side product panel */}
+              <ProductPanel
+                item={selected}
+                onClose={() => setSelectedId(null)}
+                inFocus={focus}
+              />
             </div>
 
             {/* Budget distribution */}
