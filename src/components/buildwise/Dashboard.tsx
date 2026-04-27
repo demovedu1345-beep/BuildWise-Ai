@@ -224,6 +224,9 @@ export const Dashboard = ({ plan }: Props) => {
               ))}
             </div>
           </motion.div>
+
+          {/* Detailed Area Intelligence */}
+          <DetailedAreas plan={plan} />
         </div>
       </div>
     </section>
