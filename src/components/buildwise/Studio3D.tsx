@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Sun, Moon, ExternalLink, ShoppingBag, AlertTriangle, CheckCircle2,
   TrendingDown, IndianRupee, Maximize2, Layers, Lightbulb, Sofa, Palette, X,
+  Expand, Minimize,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
   generateStudioPlan, fmtINR, StudioRoom, StudioStyle, StudioPriority, StudioInput,
@@ -46,9 +46,22 @@ export const Studio3D = () => {
   const [width, setWidth] = useState(5.0);
   const [depth, setDepth] = useState(5.5);
   const [night, setNight] = useState(false);
+  const [focus, setFocus] = useState(false);
 
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Lock body scroll while in Focus Mode + ESC to exit
+  useEffect(() => {
+    if (!focus) return;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFocus(false); };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [focus]);
 
   const effW = autoSize ? ROOMS.find((r) => r.id === room)!.w : width;
   const effD = autoSize ? ROOMS.find((r) => r.id === room)!.d : depth;
