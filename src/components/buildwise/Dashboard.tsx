@@ -320,9 +320,12 @@ const DetailedAreas = ({ plan }: { plan: Plan }) => {
   );
 };
 
-const Legend = ({ color, label }: { color: "primary" | "warning" | "destructive"; label: string }) => (
-  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-secondary/40 border border-border/50">
-    <span className={`w-1.5 h-1.5 rounded-full bg-${color}`} />
-    <span className="text-muted-foreground">{label}</span>
-  </div>
-);
+const Legend = ({ color, label }: { color: "primary" | "warning" | "destructive"; label: string }) => {
+  const dot = color === "primary" ? "bg-primary" : color === "warning" ? "bg-warning" : "bg-destructive";
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-secondary/40 border border-border/50">
+      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+      <span className="text-muted-foreground">{label}</span>
+    </div>
+  );
+};
