@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { AlertTriangle, Lightbulb, MapPin, Layers, Box, Wrench, TrendingDown, Check } from "lucide-react";
+import { AlertTriangle, Lightbulb, MapPin, Layers, Box, Wrench, TrendingDown, Check, Sparkles } from "lucide-react";
 import { Plan, fmtINR } from "@/lib/buildwise";
+import { suggestAreas } from "@/lib/locations";
 import { HouseModel } from "./HouseModel";
 
 interface Props { plan: Plan; }
@@ -115,10 +116,10 @@ export const Dashboard = ({ plan }: Props) => {
             </ul>
           </motion.div>
 
-          {/* Locations */}
+          {/* Quick locations summary */}
           <motion.div custom={2} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className={card}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display text-lg">Location Suggestions</h3>
+              <h3 className="font-display text-lg">Top Areas Snapshot</h3>
               <MapPin className="w-5 h-5 text-primary" />
             </div>
             <div className="space-y-3">
@@ -140,6 +141,7 @@ export const Dashboard = ({ plan }: Props) => {
                   </div>
                 );
               })}
+              <p className="text-[11px] text-muted-foreground pt-1">See detailed areas below ↓</p>
             </div>
           </motion.div>
 
@@ -222,8 +224,108 @@ export const Dashboard = ({ plan }: Props) => {
               ))}
             </div>
           </motion.div>
+
+          {/* Detailed Area Intelligence */}
+          <DetailedAreas plan={plan} />
         </div>
       </div>
     </section>
+  );
+};
+
+const DetailedAreas = ({ plan }: { plan: Plan }) => {
+  const suggestions = suggestAreas(plan.city.id, plan.totalBudget, plan.buildableSqft);
+  if (suggestions.length === 0) return null;
+
+  return (
+    <motion.div
+      custom={6}
+      variants={fadeUp}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true }}
+      className={`${card} lg:col-span-3`}
+    >
+      <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
+        <div>
+          <h3 className="font-display text-lg flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-primary" /> Detailed Area Intelligence — {plan.city.name}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            AI-ranked locations with price ranges, advantages and budget fit for your {plan.buildableSqft.toLocaleString("en-IN")} sqft build
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-[10px]">
+          <Legend color="primary" label="Fits" />
+          <Legend color="warning" label="Tight" />
+          <Legend color="destructive" label="Over" />
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {suggestions.map((a) => {
+          const tone =
+            a.fit === "good" ? "border-primary/30 bg-primary/5"
+            : a.fit === "tight" ? "border-warning/30 bg-warning/5"
+            : "border-destructive/30 bg-destructive/5";
+          const chip =
+            a.fit === "good" ? "text-primary bg-primary/10 border-primary/30"
+            : a.fit === "tight" ? "text-warning bg-warning/10 border-warning/30"
+            : "text-destructive bg-destructive/10 border-destructive/30";
+          const label = a.fit === "good" ? "Fits budget" : a.fit === "tight" ? "Tight fit" : "Over budget";
+          return (
+            <div key={a.name} className={`p-5 rounded-2xl border ${tone} hover-lift`}>
+              <div className="flex items-start justify-between mb-2 gap-2">
+                <div>
+                  <p className="font-medium text-foreground">{a.name}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{a.bestFor}</p>
+                </div>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap ${chip}`}>{label}</span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                <div className="p-2.5 rounded-lg bg-background/40 border border-border/40">
+                  <p className="text-muted-foreground">Price / sqft</p>
+                  <p className="font-medium mt-0.5">
+                    ₹{a.minPsf.toLocaleString("en-IN")} – ₹{a.maxPsf.toLocaleString("en-IN")}
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-background/40 border border-border/40">
+                  <p className="text-muted-foreground">Est. for {plan.buildableSqft.toLocaleString("en-IN")} sqft</p>
+                  <p className="font-medium mt-0.5">{fmtINR(a.estTotalForSqft)}</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-foreground/85 mt-3 leading-relaxed">{a.reasoning}</p>
+
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {a.advantages.map((adv) => (
+                  <span key={adv} className="text-[10px] px-2 py-0.5 rounded-full bg-secondary/60 border border-border/50 text-foreground/80">
+                    {adv}
+                  </span>
+                ))}
+              </div>
+
+              {a.fit !== "over" && (
+                <div className="mt-4 pt-3 border-t border-border/40 flex items-center gap-2 text-[11px] text-accent">
+                  <Sparkles className="w-3 h-3" />
+                  AI pick: shortlist this area
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+};
+
+const Legend = ({ color, label }: { color: "primary" | "warning" | "destructive"; label: string }) => {
+  const dot = color === "primary" ? "bg-primary" : color === "warning" ? "bg-warning" : "bg-destructive";
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-secondary/40 border border-border/50">
+      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+      <span className="text-muted-foreground">{label}</span>
+    </div>
   );
 };
