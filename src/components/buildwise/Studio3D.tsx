@@ -418,10 +418,10 @@ export const Studio3D = () => {
 const Pill = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
   <button
     onClick={onClick}
-    className={`px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
+    className={`press px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-300 ${
       active
-        ? "bg-gradient-primary text-primary-foreground shadow-[0_0_20px_hsl(205_100%_60%/0.35)]"
-        : "bg-input/40 border border-border hover:border-primary/40 text-muted-foreground"
+        ? "bg-primary/15 text-primary border border-primary/40 shadow-[0_0_20px_hsl(210_90%_62%/0.18)]"
+        : "bg-input/40 border border-border hover:border-primary/30 hover:text-foreground text-muted-foreground"
     }`}
   >
     {children}
@@ -429,8 +429,107 @@ const Pill = ({ active, onClick, children }: { active: boolean; onClick: () => v
 );
 
 const Row = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-start justify-between gap-3">
+  <div className="flex items-start justify-between gap-3 py-1.5 border-b border-border/40 last:border-0">
     <span className="text-xs text-muted-foreground shrink-0">{label}</span>
-    <span className="text-foreground/90 text-right">{value}</span>
+    <span className="text-foreground/90 text-right text-sm">{value}</span>
   </div>
 );
+
+/**
+ * Right-side sliding product panel that overlays the 3D scene.
+ * Minimal, premium product-card style.
+ */
+const ProductPanel = ({
+  item,
+  onClose,
+  inFocus,
+}: {
+  item: ReturnType<typeof generateStudioPlan>["items"][number] | null;
+  onClose: () => void;
+  inFocus: boolean;
+}) => {
+  return (
+    <AnimatePresence>
+      {item && (
+        <motion.aside
+          key={item.id}
+          initial={{ x: 32, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: 24, opacity: 0 }}
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          className={`absolute top-0 bottom-0 right-0 w-full sm:w-[380px] glass-strong border-l border-border/50 p-6 flex flex-col z-10 ${
+            inFocus ? "shadow-[0_0_80px_-20px_hsl(210_90%_50%/0.25)]" : ""
+          }`}
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between mb-5">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{item.category}</p>
+              <h4 className="font-display text-xl leading-tight mt-1.5">{item.name}</h4>
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="w-8 h-8 rounded-lg bg-secondary/60 hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition press"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Visual swatch */}
+          <div
+            className="relative h-40 rounded-2xl overflow-hidden mb-5 border border-border/40"
+            style={{
+              background: `radial-gradient(circle at 30% 30%, ${item.color}, hsl(222 22% 9%) 80%)`,
+            }}
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,hsl(40_30%_95%_/_0.06),transparent_60%)]" />
+            <div className="absolute bottom-3 left-3 text-[10px] uppercase tracking-wider text-foreground/60">
+              {item.retailer}
+            </div>
+          </div>
+
+          {/* Specs */}
+          <div className="space-y-0.5">
+            <Row label="Material" value={item.material} />
+            <Row label="Dimensions" value={item.dimensions} />
+            <Row label="Quantity" value={`${item.qty}${item.unit ? ` ${item.unit}` : ""}`} />
+            <Row label="Retailer" value={item.retailer} />
+          </div>
+
+          {/* Price */}
+          <div className="mt-5 p-4 rounded-2xl bg-secondary/40 border border-border/50">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total cost</p>
+            <p className="font-display text-3xl mt-1">{fmtINR(item.cost)}</p>
+          </div>
+
+          {/* CTA */}
+          <a
+            href={item.buyUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="press mt-5 w-full inline-flex items-center justify-center gap-2 h-12 rounded-2xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition glow-blue"
+          >
+            View Product <ExternalLink className="w-4 h-4" />
+          </a>
+
+          {item.alternative && (
+            <a
+              href={item.alternative.buyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="press mt-3 w-full inline-flex items-center justify-center gap-2 h-11 rounded-2xl border border-border hover:border-accent/40 text-sm text-foreground/85 hover:text-foreground transition"
+            >
+              <TrendingDown className="w-3.5 h-3.5 text-accent" />
+              Save ₹{item.alternative.saves.toLocaleString("en-IN")} with alternative
+            </a>
+          )}
+
+          <p className="text-[11px] text-muted-foreground mt-auto pt-6">
+            Tap any other object to switch · Press ESC to exit Focus Mode
+          </p>
+        </motion.aside>
+      )}
+    </AnimatePresence>
+  );
+};
