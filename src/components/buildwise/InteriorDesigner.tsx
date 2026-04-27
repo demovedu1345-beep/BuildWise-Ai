@@ -74,7 +74,7 @@ export const InteriorDesigner = () => {
 
             <div className="space-y-6">
               <Field label="Space type">
-                <Pills options={SPACES} value={space} onChange={setSpace} />
+                <Pills<SpaceType> options={SPACES} value={space} onChange={setSpace} />
               </Field>
 
               <Field label="Room">
