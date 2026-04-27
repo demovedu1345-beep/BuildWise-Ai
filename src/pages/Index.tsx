@@ -4,6 +4,7 @@ import { HeroPlanner } from "@/components/buildwise/HeroPlanner";
 import { Dashboard } from "@/components/buildwise/Dashboard";
 import { Loader } from "@/components/buildwise/Loader";
 import { InteriorDesigner } from "@/components/buildwise/InteriorDesigner";
+import { Studio3D } from "@/components/buildwise/Studio3D";
 import { generatePlan, Goal } from "@/lib/buildwise";
 
 const Index = () => {
@@ -53,6 +54,7 @@ const Index = () => {
         onGenerate={handleGenerate} loading={loading}
       />
       {planVisible && <Dashboard plan={plan} />}
+      <Studio3D />
       <InteriorDesigner />
       {loading && <Loader />}
 
