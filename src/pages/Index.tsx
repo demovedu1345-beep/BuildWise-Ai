@@ -3,6 +3,7 @@ import { Navbar } from "@/components/buildwise/Navbar";
 import { HeroPlanner } from "@/components/buildwise/HeroPlanner";
 import { Dashboard } from "@/components/buildwise/Dashboard";
 import { Loader } from "@/components/buildwise/Loader";
+import { InteriorDesigner } from "@/components/buildwise/InteriorDesigner";
 import { generatePlan, Goal } from "@/lib/buildwise";
 
 const Index = () => {
@@ -52,6 +53,7 @@ const Index = () => {
         onGenerate={handleGenerate} loading={loading}
       />
       {planVisible && <Dashboard plan={plan} />}
+      <InteriorDesigner />
       {loading && <Loader />}
 
       <footer className="border-t border-border/50 py-8 mt-12">
