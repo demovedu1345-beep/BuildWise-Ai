@@ -126,15 +126,19 @@ export const Dashboard = ({ plan }: Props) => {
             </div>
             <div className="space-y-2 mt-4">
               {plan.breakdown.map((d) => (
-                <div key={d.name} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-sm" style={{ background: d.color }} />
-                    <span className="text-muted-foreground">{d.name}</span>
+                <div key={d.name} className="text-sm group/row" title={d.detail}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-sm" style={{ background: d.color }} />
+                      <span className="text-muted-foreground">{d.name}</span>
+                      <Info className="w-3 h-3 text-muted-foreground/60" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground">{d.pct}%</span>
+                      <span className="font-medium">{fmtINR(d.value)}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground">{d.pct}%</span>
-                    <span className="font-medium">{fmtINR(d.value)}</span>
-                  </div>
+                  <p className="text-[10px] text-muted-foreground/70 ml-4.5 mt-0.5 leading-snug">{d.detail}</p>
                 </div>
               ))}
             </div>
