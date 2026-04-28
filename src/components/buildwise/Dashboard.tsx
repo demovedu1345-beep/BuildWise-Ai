@@ -32,9 +32,51 @@ export const Dashboard = ({ plan }: Props) => {
             <br />engineered to your budget.
           </h2>
           <p className="text-muted-foreground mt-4 text-lg">
-            {plan.buildableSqft.toLocaleString("en-IN")} sqft · {fmtINR(plan.ratePerSqft)}/sqft · {plan.goal.label}
+            ~{plan.buildableSqft.toLocaleString("en-IN")} sqft
+            <span className="text-foreground/60"> (range {plan.buildableSqftRange[0].toLocaleString("en-IN")}–{plan.buildableSqftRange[1].toLocaleString("en-IN")} sqft)</span>
+            {" · "}
+            ₹{plan.rateRange[0].toLocaleString("en-IN")}–₹{plan.rateRange[1].toLocaleString("en-IN")}/sqft
+            {" · "}{plan.goal.label}
           </p>
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="px-2.5 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary inline-flex items-center gap-1.5">
+              <ShieldCheck className="w-3 h-3" /> Confidence: {plan.confidence}
+            </span>
+            <span className="px-2.5 py-1 rounded-full border border-border/60 bg-secondary/40 text-muted-foreground">
+              Ceiling {plan.ceilingHeightM} m · Walls {plan.wallThicknessMm} mm
+            </span>
+            <span className="px-2.5 py-1 rounded-full border border-border/60 bg-secondary/40 text-muted-foreground">
+              Estimates ±10–15% — see assumptions
+            </span>
+          </div>
         </motion.div>
+
+        {/* Auto-corrections — what the AI fixed and why */}
+        {plan.corrections.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 glass rounded-2xl p-5 border border-accent/30"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center">
+                <RefreshCcw className="w-4 h-4 text-accent" />
+              </div>
+              <div>
+                <p className="font-medium text-accent">AI auto-corrections</p>
+                <p className="text-xs text-muted-foreground">Adjusted to keep the plan realistic and buildable.</p>
+              </div>
+            </div>
+            <ul className="space-y-2">
+              {plan.corrections.map((c, i) => (
+                <li key={i} className="text-sm text-foreground/85 flex gap-2 leading-relaxed">
+                  <span className="text-accent mt-1">•</span>{c}
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+
 
         {/* Warnings */}
         {plan.warnings.map((w, i) => (
