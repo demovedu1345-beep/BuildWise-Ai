@@ -205,14 +205,15 @@ export const Dashboard = ({ plan }: Props) => {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: i * 0.07, duration: 0.4 }}
-                  className="absolute rounded-lg border border-primary/30 flex items-center justify-center text-[10px] md:text-xs font-medium text-foreground/80 backdrop-blur-sm"
+                  className="absolute rounded-lg border border-primary/30 flex flex-col items-center justify-center text-[10px] md:text-xs font-medium text-foreground/80 backdrop-blur-sm px-1 text-center"
                   style={{
                     left: `${r.x}%`, top: `${r.y}%`,
                     width: `${r.w}%`, height: `${r.h}%`,
                     background: r.color,
                   }}
                 >
-                  {r.name}
+                  <span className="leading-tight">{r.name}</span>
+                  <span className="text-[9px] text-foreground/55 mt-0.5">{r.sqft} sqft</span>
                 </motion.div>
               ))}
             </div>
