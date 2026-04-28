@@ -53,6 +53,14 @@ export interface StudioPlan {
   optimizations: { item: string; suggestion: string; saves: number }[];
   palette: { wall: string; floor: string; accent: string; trim: string };
   styleNotes: string[];
+  /** Architectural / budget corrections applied to keep the plan realistic. */
+  corrections: string[];
+  /** Realistic budget band for this room/style — for trust UI. */
+  realisticBudget: { min: number; max: number };
+  /** Sqft (built-up of this single room). */
+  sqft: number;
+  /** Walkable clearance score 0-1 (1 = ample, <0.5 = cramped). */
+  walkability: number;
 }
 
 const PALETTES: Record<StudioStyle, { wall: string; floor: string; accent: string; trim: string }> = {
