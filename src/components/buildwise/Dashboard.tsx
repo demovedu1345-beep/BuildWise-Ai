@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { AlertTriangle, Lightbulb, MapPin, Layers, Box, Wrench, TrendingDown, Check, Sparkles } from "lucide-react";
+import { AlertTriangle, Lightbulb, MapPin, Layers, Box, Wrench, TrendingDown, Check, Sparkles, Info, ShieldCheck, RefreshCcw } from "lucide-react";
 import { Plan, fmtINR } from "@/lib/buildwise";
 import { suggestAreas } from "@/lib/locations";
 import { HouseModel } from "./HouseModel";
@@ -32,9 +32,51 @@ export const Dashboard = ({ plan }: Props) => {
             <br />engineered to your budget.
           </h2>
           <p className="text-muted-foreground mt-4 text-lg">
-            {plan.buildableSqft.toLocaleString("en-IN")} sqft · {fmtINR(plan.ratePerSqft)}/sqft · {plan.goal.label}
+            ~{plan.buildableSqft.toLocaleString("en-IN")} sqft
+            <span className="text-foreground/60"> (range {plan.buildableSqftRange[0].toLocaleString("en-IN")}–{plan.buildableSqftRange[1].toLocaleString("en-IN")} sqft)</span>
+            {" · "}
+            ₹{plan.rateRange[0].toLocaleString("en-IN")}–₹{plan.rateRange[1].toLocaleString("en-IN")}/sqft
+            {" · "}{plan.goal.label}
           </p>
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="px-2.5 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary inline-flex items-center gap-1.5">
+              <ShieldCheck className="w-3 h-3" /> Confidence: {plan.confidence}
+            </span>
+            <span className="px-2.5 py-1 rounded-full border border-border/60 bg-secondary/40 text-muted-foreground">
+              Ceiling {plan.ceilingHeightM} m · Walls {plan.wallThicknessMm} mm
+            </span>
+            <span className="px-2.5 py-1 rounded-full border border-border/60 bg-secondary/40 text-muted-foreground">
+              Estimates ±10–15% — see assumptions
+            </span>
+          </div>
         </motion.div>
+
+        {/* Auto-corrections — what the AI fixed and why */}
+        {plan.corrections.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 glass rounded-2xl p-5 border border-accent/30"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center">
+                <RefreshCcw className="w-4 h-4 text-accent" />
+              </div>
+              <div>
+                <p className="font-medium text-accent">AI auto-corrections</p>
+                <p className="text-xs text-muted-foreground">Adjusted to keep the plan realistic and buildable.</p>
+              </div>
+            </div>
+            <ul className="space-y-2">
+              {plan.corrections.map((c, i) => (
+                <li key={i} className="text-sm text-foreground/85 flex gap-2 leading-relaxed">
+                  <span className="text-accent mt-1">•</span>{c}
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+
 
         {/* Warnings */}
         {plan.warnings.map((w, i) => (
@@ -84,15 +126,19 @@ export const Dashboard = ({ plan }: Props) => {
             </div>
             <div className="space-y-2 mt-4">
               {plan.breakdown.map((d) => (
-                <div key={d.name} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-sm" style={{ background: d.color }} />
-                    <span className="text-muted-foreground">{d.name}</span>
+                <div key={d.name} className="text-sm group/row" title={d.detail}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-sm" style={{ background: d.color }} />
+                      <span className="text-muted-foreground">{d.name}</span>
+                      <Info className="w-3 h-3 text-muted-foreground/60" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground">{d.pct}%</span>
+                      <span className="font-medium">{fmtINR(d.value)}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground">{d.pct}%</span>
-                    <span className="font-medium">{fmtINR(d.value)}</span>
-                  </div>
+                  <p className="text-[10px] text-muted-foreground/70 ml-4.5 mt-0.5 leading-snug">{d.detail}</p>
                 </div>
               ))}
             </div>
@@ -159,14 +205,15 @@ export const Dashboard = ({ plan }: Props) => {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: i * 0.07, duration: 0.4 }}
-                  className="absolute rounded-lg border border-primary/30 flex items-center justify-center text-[10px] md:text-xs font-medium text-foreground/80 backdrop-blur-sm"
+                  className="absolute rounded-lg border border-primary/30 flex flex-col items-center justify-center text-[10px] md:text-xs font-medium text-foreground/80 backdrop-blur-sm px-1 text-center"
                   style={{
                     left: `${r.x}%`, top: `${r.y}%`,
                     width: `${r.w}%`, height: `${r.h}%`,
                     background: r.color,
                   }}
                 >
-                  {r.name}
+                  <span className="leading-tight">{r.name}</span>
+                  <span className="text-[9px] text-foreground/55 mt-0.5">{r.sqft} sqft</span>
                 </motion.div>
               ))}
             </div>
@@ -226,6 +273,26 @@ export const Dashboard = ({ plan }: Props) => {
           </motion.div>
 
           {/* Detailed Area Intelligence */}
+          {/* Trust layer — assumptions */}
+          <motion.div custom={6} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className={`${card} lg:col-span-3`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-lg flex items-center gap-2">
+                <Info className="w-5 h-5 text-primary" /> How we estimated this
+              </h3>
+              <span className="text-xs text-muted-foreground">Transparency layer</span>
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              {plan.assumptions.map((a, i) => (
+                <div key={i} className="p-3.5 rounded-xl bg-secondary/40 border border-border/50 text-xs text-foreground/85 leading-relaxed flex gap-2">
+                  <span className="text-primary mt-0.5">•</span>{a}
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-4 leading-relaxed">
+              Estimates use realistic ₹/sqft bands for {plan.city.name}. Actual cost depends on plot conditions, finish grade, brand choices, and market timing — always validate with a local contractor before committing.
+            </p>
+          </motion.div>
+
           <DetailedAreas plan={plan} />
         </div>
       </div>

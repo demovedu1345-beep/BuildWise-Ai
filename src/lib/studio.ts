@@ -53,6 +53,14 @@ export interface StudioPlan {
   optimizations: { item: string; suggestion: string; saves: number }[];
   palette: { wall: string; floor: string; accent: string; trim: string };
   styleNotes: string[];
+  /** Architectural / budget corrections applied to keep the plan realistic. */
+  corrections: string[];
+  /** Realistic budget band for this room/style — for trust UI. */
+  realisticBudget: { min: number; max: number };
+  /** Sqft (built-up of this single room). */
+  sqft: number;
+  /** Walkable clearance score 0-1 (1 = ample, <0.5 = cramped). */
+  walkability: number;
 }
 
 const PALETTES: Record<StudioStyle, { wall: string; floor: string; accent: string; trim: string }> = {
@@ -714,11 +722,111 @@ function buildItems(input: StudioInput, palette: BuildCtx["palette"]): PlacedIte
 
 // ---- MAIN PLAN GENERATOR ---------------------------------------------------
 
-export function generateStudioPlan(input: StudioInput): StudioPlan {
+// Realistic room dimension ranges (meters) — width × depth bounds.
+const ROOM_DIM_RANGES: Record<StudioRoom, { wMin: number; wMax: number; dMin: number; dMax: number }> = {
+  bedroom:  { wMin: 3.0, wMax: 5.5, dMin: 3.0, dMax: 5.5 },
+  living:   { wMin: 3.5, wMax: 7.5, dMin: 3.5, dMax: 7.5 },
+  kitchen:  { wMin: 2.4, wMax: 4.5, dMin: 2.4, dMax: 4.5 },
+  bathroom: { wMin: 1.5, wMax: 3.5, dMin: 1.8, dMax: 3.5 },
+};
+
+// Realistic interior budget bands (₹) for a single room, excluding civil work.
+const REALISTIC_BUDGET: Record<StudioRoom, Record<StudioStyle, { min: number; max: number }>> = {
+  bedroom: {
+    minimal:     { min: 60000,  max: 180000 },
+    modern:      { min: 90000,  max: 260000 },
+    traditional: { min: 100000, max: 280000 },
+    luxury:      { min: 250000, max: 700000 },
+  },
+  living: {
+    minimal:     { min: 100000, max: 280000 },
+    modern:      { min: 150000, max: 450000 },
+    traditional: { min: 180000, max: 500000 },
+    luxury:      { min: 400000, max: 1200000 },
+  },
+  kitchen: {
+    minimal:     { min: 120000, max: 250000 },
+    modern:      { min: 180000, max: 450000 },
+    traditional: { min: 200000, max: 500000 },
+    luxury:      { min: 400000, max: 1100000 },
+  },
+  bathroom: {
+    minimal:     { min: 50000,  max: 120000 },
+    modern:      { min: 80000,  max: 200000 },
+    traditional: { min: 90000,  max: 220000 },
+    luxury:      { min: 200000, max: 600000 },
+  },
+};
+
+function clampRoom(input: StudioInput, corrections: string[]): StudioInput {
+  const r = ROOM_DIM_RANGES[input.room];
+  let w = input.width, d = input.depth;
+  if (w < r.wMin) { corrections.push(`${input.room} width ${w.toFixed(1)} m is below realistic minimum (${r.wMin} m). Adjusted to ${r.wMin} m.`); w = r.wMin; }
+  if (w > r.wMax) { corrections.push(`${input.room} width ${w.toFixed(1)} m exceeds typical maximum (${r.wMax} m). Capped to ${r.wMax} m.`); w = r.wMax; }
+  if (d < r.dMin) { corrections.push(`${input.room} depth ${d.toFixed(1)} m is below realistic minimum (${r.dMin} m). Adjusted to ${r.dMin} m.`); d = r.dMin; }
+  if (d > r.dMax) { corrections.push(`${input.room} depth ${d.toFixed(1)} m exceeds typical maximum (${r.dMax} m). Capped to ${r.dMax} m.`); d = r.dMax; }
+  return { ...input, width: w, depth: d };
+}
+
+/** Compute walkability score by measuring free floor area after subtracting furniture footprints. */
+function computeWalkability(items: PlacedItem[], W: number, D: number): number {
+  const floorArea = W * D;
+  const occupied = items
+    .filter((it) => it.shape !== "lamp" && it.shape !== "frame" && it.size[1] > 0.05 && it.pos[1] < 1.5)
+    .reduce((s, it) => s + it.size[0] * it.size[2], 0);
+  const free = Math.max(0, floorArea - occupied);
+  return Math.min(1, free / floorArea);
+}
+
+/** Drop non-essential items if walkability is too low. Essentials: bed/sofa/wardrobe/cabinets. */
+const ESSENTIAL_IDS = new Set([
+  "bed", "headboard", "wardrobe",         // bedroom
+  "sofa", "tvunit", "tv",                 // living
+  "cabinets-base", "cabinets-wall", "counter", "hob", "chimney", // kitchen
+  "wc", "vanity", "shower",               // bathroom
+  "flooring", "paint",
+]);
+
+function enforceClearance(items: PlacedItem[], W: number, D: number, corrections: string[]): PlacedItem[] {
+  let walk = computeWalkability(items, W, D);
+  if (walk >= 0.45) return items;
+  // Sort removable items by largest footprint first
+  const removable = items
+    .map((it, idx) => ({ idx, area: it.size[0] * it.size[2], it }))
+    .filter((x) => !ESSENTIAL_IDS.has(x.it.id))
+    .sort((a, b) => b.area - a.area);
+
+  let result = [...items];
+  for (const r of removable) {
+    if (walk >= 0.45) break;
+    result = result.filter((it) => it.id !== r.it.id);
+    walk = computeWalkability(result, W, D);
+    corrections.push(`Removed "${r.it.name}" to maintain walkable clearance (≥45% free floor).`);
+  }
+  return result;
+}
+
+export function generateStudioPlan(rawInput: StudioInput): StudioPlan {
+  const corrections: string[] = [];
+  // 1. Clamp dimensions to realistic ranges
+  const input = clampRoom(rawInput, corrections);
   const palette = PALETTES[input.style];
+
+  // 2. Validate budget against realistic bands — auto-adjust style or warn
+  const band = REALISTIC_BUDGET[input.room][input.style];
+  if (input.budget < band.min) {
+    corrections.push(
+      `Budget ₹${input.budget.toLocaleString("en-IN")} is below realistic minimum (₹${band.min.toLocaleString("en-IN")}) for a ${input.style} ${input.room}. Plan will prioritize essentials and skip premium accents.`
+    );
+  } else if (input.budget > band.max * 1.5) {
+    corrections.push(
+      `Budget ₹${input.budget.toLocaleString("en-IN")} exceeds typical ${input.style} ${input.room} (₹${band.max.toLocaleString("en-IN")}). Excess can fund higher-grade finishes or premium brands.`
+    );
+  }
+
   let items = buildItems(input, palette);
 
-  // Add materials line items (paint + flooring)
+  // 3. Add materials line items (paint + flooring)
   const area = input.width * input.depth;
   items.push({
     id: "flooring",
@@ -756,9 +864,12 @@ export function generateStudioPlan(input: StudioInput): StudioPlan {
     shape: "box",
   });
 
+  // 4. Enforce walkable clearance — drop non-essentials if cramped
+  items = enforceClearance(items, input.width, input.depth, corrections);
+
   let subtotal = items.reduce((s, it) => s + it.cost, 0);
 
-  // Auto-optimize to fit budget (style consistency preserved)
+  // 5. Auto-optimize to fit budget (style consistency preserved)
   const optimizations: StudioPlan["optimizations"] = [];
   if (subtotal > input.budget) {
     const candidates = items
@@ -784,6 +895,11 @@ export function generateStudioPlan(input: StudioInput): StudioPlan {
       };
       subtotal = items.reduce((s, x) => s + x.cost, 0);
     }
+    if (subtotal > input.budget) {
+      corrections.push(
+        `Even after swaps, plan is ₹${(subtotal - input.budget).toLocaleString("en-IN")} over budget. Consider raising budget or simplifying further.`
+      );
+    }
   } else {
     items
       .filter((it) => it.alternative)
@@ -798,6 +914,8 @@ export function generateStudioPlan(input: StudioInput): StudioPlan {
   }
 
   const split = SPLIT_BY_PRIORITY[input.priority];
+  const walkability = computeWalkability(items, input.width, input.depth);
+  const sqft = Math.round(area * 10.764);
 
   return {
     input,
@@ -808,6 +926,10 @@ export function generateStudioPlan(input: StudioInput): StudioPlan {
     optimizations,
     palette,
     styleNotes: STYLE_NOTES[input.style],
+    corrections,
+    realisticBudget: band,
+    sqft,
+    walkability,
   };
 }
 

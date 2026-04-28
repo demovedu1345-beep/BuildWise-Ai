@@ -230,7 +230,11 @@ export const Studio3D = () => {
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Subtotal <span className="text-foreground font-medium">{fmtINR(plan.subtotal)}</span> ·
                   Budget <span className="text-foreground font-medium">{fmtINR(budget)}</span> ·
-                  {plan.items.length} items
+                  {plan.items.length} items · {plan.sqft} sqft
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Realistic range for a {plan.input.style} {plan.input.room}: {fmtINR(plan.realisticBudget.min)} – {fmtINR(plan.realisticBudget.max)} ·
+                  Walkability {Math.round(plan.walkability * 100)}%
                 </p>
               </div>
               <div className="text-right">
@@ -238,6 +242,22 @@ export const Studio3D = () => {
                 <p className="font-display text-2xl text-gradient-gold">{fmtINR(plan.subtotal)}</p>
               </div>
             </div>
+
+            {/* Auto-corrections */}
+            {plan.corrections.length > 0 && (
+              <div className="glass rounded-2xl p-4 md:p-5 border border-accent/30">
+                <p className="font-medium text-accent text-sm flex items-center gap-2 mb-2">
+                  <Sparkles className="w-4 h-4" /> AI auto-corrections
+                </p>
+                <ul className="space-y-1.5">
+                  {plan.corrections.map((c, i) => (
+                    <li key={i} className="text-xs text-foreground/85 flex gap-2 leading-relaxed">
+                      <span className="text-accent mt-0.5">•</span>{c}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* 3D scene — full width, with Focus Mode + sliding right product panel */}
             <div
