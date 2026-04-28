@@ -273,6 +273,26 @@ export const Dashboard = ({ plan }: Props) => {
           </motion.div>
 
           {/* Detailed Area Intelligence */}
+          {/* Trust layer — assumptions */}
+          <motion.div custom={6} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className={`${card} lg:col-span-3`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-lg flex items-center gap-2">
+                <Info className="w-5 h-5 text-primary" /> How we estimated this
+              </h3>
+              <span className="text-xs text-muted-foreground">Transparency layer</span>
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              {plan.assumptions.map((a, i) => (
+                <div key={i} className="p-3.5 rounded-xl bg-secondary/40 border border-border/50 text-xs text-foreground/85 leading-relaxed flex gap-2">
+                  <span className="text-primary mt-0.5">•</span>{a}
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-4 leading-relaxed">
+              Estimates use realistic ₹/sqft bands for {plan.city.name}. Actual cost depends on plot conditions, finish grade, brand choices, and market timing — always validate with a local contractor before committing.
+            </p>
+          </motion.div>
+
           <DetailedAreas plan={plan} />
         </div>
       </div>
