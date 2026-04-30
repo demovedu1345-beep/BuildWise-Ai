@@ -638,7 +638,7 @@ const RealisticScene = ({ plan, hoveredId, selectedId, onHover, onSelect, night 
       <SceneSettings night={night} />
       <color attach="background" args={[night ? "#08090C" : "#15171C"]} />
       <fog attach="fog" args={[night ? "#08090C" : "#15171C", 12, 34]} />
-      <SoftShadows size={32} samples={20} focus={0.72} />
+      <SoftShadows size={24} samples={12} focus={0.7} />
 
       <ambientLight intensity={night ? 0.055 : 0.16} />
       <hemisphereLight args={[night ? "#1C2B4A" : "#FFF1D6", "#12100E", night ? 0.16 : 0.28]} />
@@ -647,7 +647,7 @@ const RealisticScene = ({ plan, hoveredId, selectedId, onHover, onSelect, night 
         intensity={night ? 0.34 : 2.7}
         color={night ? "#8BA4DC" : "#FFE0B2"}
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[1024, 1024]}
         shadow-bias={-0.00018}
         shadow-normalBias={0.025}
         shadow-camera-near={0.1}
@@ -658,19 +658,18 @@ const RealisticScene = ({ plan, hoveredId, selectedId, onHover, onSelect, night 
         shadow-camera-bottom={-D}
       />
       <directionalLight position={[-W * 0.8, H * 1.4, D * 0.7]} intensity={night ? 0.12 : 0.38} color={night ? "#344870" : "#DCEBFF"} />
-      <pointLight position={[0, H - 0.35, 0]} intensity={night ? 0.8 : 0.28} distance={Math.max(W, D) * 1.25} decay={2} color="#FFD7A0" castShadow />
+      <pointLight position={[0, H - 0.35, 0]} intensity={night ? 0.8 : 0.28} distance={Math.max(W, D) * 1.25} decay={2} color="#FFD7A0" castShadow={false} />
 
       <Walls W={W} D={D} H={H} plan={plan} materials={materials} />
       <RoomObjects plan={plan} hoveredId={hoveredId} selectedId={selectedId} onHover={onHover} onSelect={onSelect} materials={materials} />
 
-      <ContactShadows position={[0, 0.012, 0]} opacity={night ? 0.52 : 0.76} scale={Math.max(W, D) * 1.35} blur={2.8} far={2.8} resolution={1024} color="#000000" />
+      <ContactShadows position={[0, 0.012, 0]} opacity={night ? 0.5 : 0.72} scale={Math.max(W, D) * 1.35} blur={2.6} far={2.6} resolution={512} color="#000000" />
       <Environment preset={night ? "night" : "apartment"} background={false} environmentIntensity={night ? 0.28 : 0.95} blur={0.35} />
 
-      <EffectComposer multisampling={2} enableNormalPass>
-        <N8AO aoRadius={1.15} distanceFalloff={0.82} intensity={1.65} quality="medium" />
-        <Bloom luminanceThreshold={1.1} luminanceSmoothing={0.24} intensity={night ? 0.13 : 0.065} mipmapBlur />
-        <DepthOfField focusDistance={0.035} focalLength={0.035} bokehScale={0.8} height={360} />
-        <Vignette offset={0.42} darkness={0.34} />
+      <EffectComposer multisampling={0} enableNormalPass>
+        <N8AO aoRadius={1.0} distanceFalloff={0.8} intensity={1.4} quality="low" />
+        <Bloom luminanceThreshold={1.15} luminanceSmoothing={0.22} intensity={night ? 0.12 : 0.06} mipmapBlur />
+        <Vignette offset={0.42} darkness={0.32} />
       </EffectComposer>
 
       <OrbitControls
@@ -701,7 +700,8 @@ export const RoomScene = ({ plan, hoveredId, selectedId, onHover, onSelect, nigh
       camera={{ position: [eyeX, 1.72, eyeZ], fov: 46, near: 0.1, far: 80 }}
       onPointerMissed={() => onSelect(null)}
       gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
-      dpr={[1, 2]}
+      dpr={[1, 1.5]}
+      performance={{ min: 0.5 }}
     >
       <Suspense fallback={null}>
         <RealisticScene plan={plan} hoveredId={hoveredId} selectedId={selectedId} onHover={onHover} onSelect={onSelect} night={night} />
