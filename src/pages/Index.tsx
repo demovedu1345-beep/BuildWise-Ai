@@ -5,6 +5,7 @@ import { Dashboard } from "@/components/buildwise/Dashboard";
 import { Loader } from "@/components/buildwise/Loader";
 import { InteriorDesigner } from "@/components/buildwise/InteriorDesigner";
 import { Studio3D } from "@/components/buildwise/Studio3D";
+import { SmoothScroll } from "@/components/buildwise/SmoothScroll";
 import { generatePlan, Goal } from "@/lib/buildwise";
 
 const Index = () => {
@@ -45,6 +46,7 @@ const Index = () => {
 
   return (
     <main className="relative min-h-screen overflow-x-hidden">
+      <SmoothScroll />
       <Navbar />
       <HeroPlanner
         budget={budget} setBudget={setBudget}
