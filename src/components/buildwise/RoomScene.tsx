@@ -1,4 +1,4 @@
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, ThreeEvent, useThree } from "@react-three/fiber";
 import {
   OrbitControls,
   Environment,
@@ -279,17 +279,17 @@ const pickSurfaceMaterial = (item: PlacedItem, meshName: string, materials: Mate
 };
 
 const useInteractiveHandlers = (item: PlacedItem, onHover: (id: string | null) => void, onSelect: (id: string | null) => void) => ({
-  onPointerOver: (e: any) => {
+  onPointerOver: (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     onHover(item.id);
     document.body.style.cursor = "pointer";
   },
-  onPointerOut: (e: any) => {
+  onPointerOut: (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     onHover(null);
     document.body.style.cursor = "default";
   },
-  onClick: (e: any) => {
+  onClick: (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     onSelect(item.id);
   },
@@ -335,7 +335,7 @@ const FurnitureModel = ({
       }
     });
     return cloned;
-  }, [asset, gltf.scene, item, materials, highlighted, selected]);
+  }, [gltf.scene, item, materials, highlighted, selected]);
 
   const { scale, offset } = useMemo(() => {
     const box = new THREE.Box3().setFromObject(scene);
