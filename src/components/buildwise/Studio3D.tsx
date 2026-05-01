@@ -645,6 +645,15 @@ export const Studio3D = () => {
           </div>
         </div>
       </div>
+
+      {/* Add Item Panel (modal overlay) */}
+      {showAddPanel && (
+        <AddItemPanel
+          catalogByCategory={catalogByCategory}
+          onAdd={handleAddItem}
+          onClose={() => setShowAddPanel(false)}
+        />
+      )}
     </section>
   );
 };
