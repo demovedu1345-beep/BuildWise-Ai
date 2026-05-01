@@ -1,15 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Sun, Moon, ExternalLink, ShoppingBag, AlertTriangle, CheckCircle2,
   TrendingDown, IndianRupee, Maximize2, Layers, Lightbulb, Sofa, Palette, X,
-  Expand, Minimize,
+  Expand, Minimize, Image, Box, Loader2,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import {
   generateStudioPlan, fmtINR, StudioRoom, StudioStyle, StudioPriority, StudioInput,
 } from "@/lib/studio";
-import { RoomScene } from "./RoomScene";
+import { RoomImagePreview } from "./RoomImagePreview";
+
+const RoomScene = lazy(() => import("./RoomScene").then((m) => ({ default: m.RoomScene })));
+
+type ViewMode = "image" | "3d";
 
 const ROOMS: { id: StudioRoom; label: string; w: number; d: number }[] = [
   { id: "bedroom", label: "Bedroom", w: 4.0, d: 4.5 },
