@@ -523,6 +523,9 @@ export const Studio3D = () => {
                   item={selected}
                   onClose={() => setSelectedId(null)}
                   inFocus={focus}
+                  onDelete={handleDeleteItem}
+                  onRotate={handleRotateItem}
+                  onMove={handleMoveItem}
                 />
               )}
             </div>
