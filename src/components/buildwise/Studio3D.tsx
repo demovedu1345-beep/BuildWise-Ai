@@ -1,13 +1,16 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Sun, Moon, ExternalLink, ShoppingBag, AlertTriangle, CheckCircle2,
   TrendingDown, IndianRupee, Maximize2, Layers, Lightbulb, Sofa, Palette, X,
-  Expand, Minimize, Image, Box, Loader2,
+  Expand, Minimize, Image, Box, Loader2, Plus, RotateCcw, Trash2, Move, RefreshCw,
+  Paintbrush,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import {
   generateStudioPlan, fmtINR, StudioRoom, StudioStyle, StudioPriority, StudioInput,
+  PlacedItem, getCatalogForRoom, createItemFromCatalog, MATERIAL_OPTIONS, STYLE_COST_MULT,
+  CatalogItem,
 } from "@/lib/studio";
 import { RoomImagePreview } from "./RoomImagePreview";
 
@@ -51,12 +54,19 @@ export const Studio3D = () => {
   const [depth, setDepth] = useState(5.5);
   const [night, setNight] = useState(false);
   const [focus, setFocus] = useState(false);
+  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 999999));
 
   const [viewMode, setViewMode] = useState<ViewMode>("image");
   const [is3DLoading, setIs3DLoading] = useState(false);
 
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  const [showEditPanel, setShowEditPanel] = useState(false);
+
+  // User-modified items overlay on top of AI-generated plan
+  const [userItems, setUserItems] = useState<PlacedItem[]>([]);
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
   // Detect low-end device
   const isLowEnd = useMemo(() => {
@@ -81,8 +91,21 @@ export const Studio3D = () => {
   const effW = autoSize ? ROOMS.find((r) => r.id === room)!.w : width;
   const effD = autoSize ? ROOMS.find((r) => r.id === room)!.d : depth;
 
-  const input: StudioInput = { room, style, priority, budget, width: effW, depth: effD, height: 2.7 };
-  const plan = useMemo(() => generateStudioPlan(input), [room, style, priority, budget, effW, effD]);
+  const input: StudioInput = { room, style, priority, budget, width: effW, depth: effD, height: 2.7, seed };
+  const basePlan = useMemo(() => generateStudioPlan(input), [room, style, priority, budget, effW, effD, seed]);
+
+  // Merge user modifications into plan
+  const plan = useMemo(() => {
+    const aiItems = basePlan.items.filter((it) => !deletedIds.has(it.id));
+    const allItems = [...aiItems, ...userItems];
+    const subtotal = allItems.reduce((s, it) => s + it.cost, 0);
+    return {
+      ...basePlan,
+      items: allItems,
+      subtotal,
+      withinBudget: subtotal <= budget,
+    };
+  }, [basePlan, userItems, deletedIds, budget]);
 
   const selected = selectedId ? plan.items.find((i) => i.id === selectedId) ?? null : null;
 
@@ -95,6 +118,71 @@ export const Studio3D = () => {
     });
     return out;
   }, [plan.items]);
+
+  // Catalog items for current room
+  const catalog = useMemo(() => getCatalogForRoom(room), [room]);
+  const catalogByCategory = useMemo(() => {
+    const out: Record<string, CatalogItem[]> = {};
+    catalog.forEach((c) => {
+      out[c.category] ||= [];
+      out[c.category].push(c);
+    });
+    return out;
+  }, [catalog]);
+
+  // Handlers
+  const handleRegenerate = useCallback(() => {
+    setSeed(Math.floor(Math.random() * 999999));
+    setUserItems([]);
+    setDeletedIds(new Set());
+    setSelectedId(null);
+  }, []);
+
+  const handleAddItem = useCallback((cat: CatalogItem) => {
+    const pos: [number, number, number] = [
+      (Math.random() - 0.5) * effW * 0.5,
+      cat.size[1] / 2,
+      (Math.random() - 0.5) * effD * 0.5,
+    ];
+    const item = createItemFromCatalog(cat, pos, STYLE_COST_MULT[style]);
+    setUserItems((prev) => [...prev, item]);
+    setSelectedId(item.id);
+    setShowAddPanel(false);
+  }, [effW, effD, style]);
+
+  const handleDeleteItem = useCallback((id: string) => {
+    // Check if it's a user-added item
+    if (userItems.some((it) => it.id === id)) {
+      setUserItems((prev) => prev.filter((it) => it.id !== id));
+    } else {
+      setDeletedIds((prev) => new Set(prev).add(id));
+    }
+    setSelectedId(null);
+  }, [userItems]);
+
+  const handleRotateItem = useCallback((id: string) => {
+    const updateFn = (items: PlacedItem[]) =>
+      items.map((it) => it.id === id ? { ...it, rot: (it.rot ?? 0) + Math.PI / 4 } : it);
+    if (userItems.some((it) => it.id === id)) {
+      setUserItems(updateFn);
+    }
+    // For AI items, we'd need to clone them to userItems to modify
+  }, [userItems]);
+
+  const handleMoveItem = useCallback((id: string, dx: number, dz: number) => {
+    const updateFn = (items: PlacedItem[]) =>
+      items.map((it) => it.id === id ? { ...it, pos: [it.pos[0] + dx, it.pos[1], it.pos[2] + dz] as [number, number, number] } : it);
+    if (userItems.some((it) => it.id === id)) {
+      setUserItems(updateFn);
+    }
+  }, [userItems]);
+
+  // Reset user modifications when room/style changes
+  useEffect(() => {
+    setUserItems([]);
+    setDeletedIds(new Set());
+    setSelectedId(null);
+  }, [room, style]);
 
   return (
     <section id="studio" className="relative py-20 md:py-28 border-t border-border/50">
@@ -221,9 +309,25 @@ export const Studio3D = () => {
               </div>
             </div>
 
+            {/* Action buttons */}
+            <div className="space-y-2 border-t border-border/50 pt-4">
+              <button
+                onClick={handleRegenerate}
+                className="press w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-primary/10 border border-primary/30 text-primary text-xs font-medium hover:bg-primary/20 transition-all"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Generate New Design
+              </button>
+              <button
+                onClick={() => setShowAddPanel(true)}
+                className="press w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-accent/10 border border-accent/30 text-accent text-xs font-medium hover:bg-accent/20 transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Item
+              </button>
+            </div>
+
             <div className="text-[11px] text-muted-foreground leading-relaxed border-t border-border/50 pt-4">
               <p className="mb-1 text-foreground/80 font-medium">Tip</p>
-              Drag to orbit · scroll to zoom · click any object to inspect price & buy link.
+              Click any object to edit, move, or delete. Use "Generate New Design" for a unique layout every time.
             </div>
           </div>
 
@@ -419,6 +523,9 @@ export const Studio3D = () => {
                   item={selected}
                   onClose={() => setSelectedId(null)}
                   inFocus={focus}
+                  onDelete={handleDeleteItem}
+                  onRotate={handleRotateItem}
+                  onMove={handleMoveItem}
                 />
               )}
             </div>
@@ -487,17 +594,26 @@ export const Studio3D = () => {
                               {it.material} · {it.dimensions} · Qty {it.qty}{it.unit ? ` ${it.unit}` : ""}
                             </p>
                           </div>
-                          <div className="text-right shrink-0">
-                            <p className="font-display text-base">{fmtINR(it.cost)}</p>
-                            <a
-                              href={it.buyUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-[11px] text-primary inline-flex items-center gap-1 hover:underline"
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="text-right">
+                              <p className="font-display text-base">{fmtINR(it.cost)}</p>
+                              <a
+                                href={it.buyUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[11px] text-primary inline-flex items-center gap-1 hover:underline"
+                              >
+                                Buy <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteItem(it.id); }}
+                              className="w-7 h-7 rounded-lg bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center text-destructive/70 hover:text-destructive transition shrink-0"
+                              aria-label="Delete item"
                             >
-                              Buy <ExternalLink className="w-3 h-3" />
-                            </a>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </button>
                       ))}
@@ -529,6 +645,15 @@ export const Studio3D = () => {
           </div>
         </div>
       </div>
+
+      {/* Add Item Panel (modal overlay) */}
+      {showAddPanel && (
+        <AddItemPanel
+          catalogByCategory={catalogByCategory}
+          onAdd={handleAddItem}
+          onClose={() => setShowAddPanel(false)}
+        />
+      )}
     </section>
   );
 };
@@ -561,10 +686,16 @@ const ProductPanel = ({
   item,
   onClose,
   inFocus,
+  onDelete,
+  onRotate,
+  onMove,
 }: {
-  item: ReturnType<typeof generateStudioPlan>["items"][number] | null;
+  item: PlacedItem | null;
   onClose: () => void;
   inFocus: boolean;
+  onDelete: (id: string) => void;
+  onRotate: (id: string) => void;
+  onMove: (id: string, dx: number, dz: number) => void;
 }) => {
   return (
     <AnimatePresence>
@@ -575,7 +706,7 @@ const ProductPanel = ({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: 24, opacity: 0 }}
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          className={`absolute top-0 bottom-0 right-0 w-full sm:w-[380px] glass-strong border-l border-border/50 p-6 flex flex-col z-10 ${
+          className={`absolute top-0 bottom-0 right-0 w-full sm:w-[380px] glass-strong border-l border-border/50 p-6 flex flex-col z-10 overflow-y-auto ${
             inFocus ? "shadow-[0_0_80px_-20px_hsl(210_90%_50%/0.25)]" : ""
           }`}
         >
@@ -584,6 +715,9 @@ const ProductPanel = ({
             <div>
               <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{item.category}</p>
               <h4 className="font-display text-xl leading-tight mt-1.5">{item.name}</h4>
+              {item.userAdded && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 mt-1.5 inline-block">Custom</span>
+              )}
             </div>
             <button
               onClick={onClose}
@@ -594,9 +728,32 @@ const ProductPanel = ({
             </button>
           </div>
 
+          {/* Edit controls */}
+          <div className="flex items-center gap-2 mb-5">
+            <button
+              onClick={() => onRotate(item.id)}
+              className="press flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-secondary/60 border border-border/50 text-xs text-foreground/80 hover:text-foreground hover:border-primary/30 transition"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Rotate
+            </button>
+            <button
+              onClick={() => onMove(item.id, 0.2, 0)}
+              className="press flex items-center justify-center gap-1 h-9 w-9 rounded-xl bg-secondary/60 border border-border/50 text-xs text-foreground/80 hover:text-foreground hover:border-primary/30 transition"
+              title="Move right"
+            >
+              <Move className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => onDelete(item.id)}
+              className="press flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-destructive/10 border border-destructive/30 text-xs text-destructive/80 hover:text-destructive hover:bg-destructive/20 transition"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Delete
+            </button>
+          </div>
+
           {/* Visual swatch */}
           <div
-            className="relative h-40 rounded-2xl overflow-hidden mb-5 border border-border/40"
+            className="relative h-32 rounded-2xl overflow-hidden mb-5 border border-border/40"
             style={{
               background: `radial-gradient(circle at 30% 30%, ${item.color}, hsl(222 22% 9%) 80%)`,
             }}
@@ -651,3 +808,75 @@ const ProductPanel = ({
     </AnimatePresence>
   );
 };
+
+/**
+ * Add Item panel — category-grouped catalog browser
+ */
+const AddItemPanel = ({
+  catalogByCategory,
+  onAdd,
+  onClose,
+}: {
+  catalogByCategory: Record<string, CatalogItem[]>;
+  onAdd: (cat: CatalogItem) => void;
+  onClose: () => void;
+}) => (
+  <AnimatePresence>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-md"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: 20, opacity: 0, scale: 0.97 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        exit={{ y: 10, opacity: 0, scale: 0.98 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        className="glass-strong rounded-3xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto border border-border/50"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="font-display text-xl">Add Item</h3>
+            <p className="text-xs text-muted-foreground mt-1">Choose an item to place in your room</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg bg-secondary/60 hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition press"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="space-y-5">
+          {Object.entries(catalogByCategory).map(([cat, items]) => (
+            <div key={cat}>
+              <p className="text-[10px] uppercase tracking-wider text-accent mb-2">{cat}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {items.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => onAdd(item)}
+                    className="press text-left p-3 rounded-xl border border-border/50 bg-secondary/30 hover:border-primary/40 hover:bg-primary/5 transition-all group"
+                  >
+                    <div
+                      className="w-full h-12 rounded-lg mb-2 border border-border/30"
+                      style={{
+                        background: `radial-gradient(circle at 40% 40%, ${item.color}44, hsl(222 22% 9%) 80%)`,
+                      }}
+                    />
+                    <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">{item.name}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{item.material}</p>
+                    <p className="text-xs font-display text-foreground/80 mt-1">{fmtINR(item.baseCost)}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
+  </AnimatePresence>
+);

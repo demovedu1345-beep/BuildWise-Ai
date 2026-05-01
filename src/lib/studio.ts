@@ -1,5 +1,5 @@
 // AI Room Studio — 3D-aware design engine with budget distribution,
-// style consistency, smart placement and purchase links.
+// style consistency, smart placement, variation engine and purchase links.
 
 export type StudioRoom = "bedroom" | "living" | "kitchen" | "bathroom";
 export type StudioStyle = "modern" | "luxury" | "minimal" | "traditional";
@@ -13,6 +13,7 @@ export interface StudioInput {
   width: number;         // meters
   depth: number;         // meters
   height?: number;       // meters
+  seed?: number;         // variation seed for layout randomization
 }
 
 export interface PlacedItem {
@@ -34,6 +35,7 @@ export interface PlacedItem {
   color: string;                 // hex
   shape?: "box" | "cylinder" | "lamp" | "rug" | "frame";
   alternative?: { name: string; saves: number; buyUrl: string };
+  userAdded?: boolean;           // true if user manually added this item
 }
 
 export interface BudgetSplit {
@@ -53,15 +55,146 @@ export interface StudioPlan {
   optimizations: { item: string; suggestion: string; saves: number }[];
   palette: { wall: string; floor: string; accent: string; trim: string };
   styleNotes: string[];
-  /** Architectural / budget corrections applied to keep the plan realistic. */
   corrections: string[];
-  /** Realistic budget band for this room/style — for trust UI. */
   realisticBudget: { min: number; max: number };
-  /** Sqft (built-up of this single room). */
   sqft: number;
-  /** Walkable clearance score 0-1 (1 = ample, <0.5 = cramped). */
   walkability: number;
 }
+
+// ---- VARIATION ENGINE -------------------------------------------------------
+
+/** Simple seeded PRNG for deterministic randomization */
+function seededRandom(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+/** Pick one item from array using rng */
+function pick<T>(arr: T[], rng: () => number): T {
+  return arr[Math.floor(rng() * arr.length)];
+}
+
+/** Jitter a number by ±range */
+function jitter(value: number, range: number, rng: () => number): number {
+  return value + (rng() - 0.5) * 2 * range;
+}
+
+// ---- ADDABLE ITEMS CATALOG --------------------------------------------------
+
+export interface CatalogItem {
+  id: string;
+  category: PlacedItem["category"];
+  name: string;
+  material: string;
+  baseCost: number;
+  size: [number, number, number];
+  shape: PlacedItem["shape"];
+  color: string;
+  retailer: PlacedItem["retailer"];
+  searchQuery: string;
+  rooms: StudioRoom[];  // compatible rooms
+}
+
+export const ITEM_CATALOG: CatalogItem[] = [
+  // Furniture
+  { id: "cat-sofa-modern", category: "Furniture", name: "Modern 3-Seater Sofa", material: "Fabric + foam", baseCost: 28000, size: [2.2, 0.9, 0.95], shape: "box", color: "#4A5568", retailer: "Pepperfry", searchQuery: "3 seater fabric sofa", rooms: ["living"] },
+  { id: "cat-sofa-leather", category: "Furniture", name: "Leather L-Shape Sofa", material: "Leather", baseCost: 65000, size: [2.6, 0.9, 0.95], shape: "box", color: "#3A2A22", retailer: "Pepperfry", searchQuery: "L shape leather sofa", rooms: ["living"] },
+  { id: "cat-armchair", category: "Furniture", name: "Accent Armchair", material: "Velvet", baseCost: 14000, size: [0.8, 0.85, 0.85], shape: "box", color: "#6A7A8A", retailer: "Urban Ladder", searchQuery: "accent armchair", rooms: ["living", "bedroom"] },
+  { id: "cat-bed-queen", category: "Furniture", name: "Queen Bed with Storage", material: "Engineered wood", baseCost: 28000, size: [1.8, 0.55, 2.05], shape: "box", color: "#2A2D34", retailer: "Pepperfry", searchQuery: "queen bed storage", rooms: ["bedroom"] },
+  { id: "cat-bed-king", category: "Furniture", name: "King Bed (Velvet Headboard)", material: "Velvet + Solid wood", baseCost: 45000, size: [2.0, 0.55, 2.05], shape: "box", color: "#5C2A2A", retailer: "Pepperfry", searchQuery: "king bed velvet", rooms: ["bedroom"] },
+  { id: "cat-wardrobe", category: "Furniture", name: "Sliding Wardrobe", material: "Engineered wood + laminate", baseCost: 35000, size: [0.6, 2.1, 2.0], shape: "box", color: "#2A2D34", retailer: "Pepperfry", searchQuery: "sliding wardrobe", rooms: ["bedroom"] },
+  { id: "cat-dresser", category: "Furniture", name: "Dresser with Mirror", material: "Engineered wood", baseCost: 11000, size: [0.45, 0.85, 1.2], shape: "box", color: "#2A2D34", retailer: "Urban Ladder", searchQuery: "dresser mirror", rooms: ["bedroom"] },
+  { id: "cat-coffee-table", category: "Furniture", name: "Coffee Table", material: "Wood + metal", baseCost: 6500, size: [1.1, 0.45, 0.6], shape: "box", color: "#2A2D34", retailer: "Urban Ladder", searchQuery: "modern coffee table", rooms: ["living"] },
+  { id: "cat-side-table", category: "Furniture", name: "Side Table", material: "Engineered wood", baseCost: 2400, size: [0.45, 0.5, 0.4], shape: "box", color: "#2A2D34", retailer: "IKEA", searchQuery: "side table", rooms: ["living", "bedroom"] },
+  { id: "cat-tv-unit", category: "Furniture", name: "TV Unit Cabinet", material: "Engineered wood", baseCost: 12000, size: [1.8, 0.5, 0.4], shape: "box", color: "#2A2D34", retailer: "Urban Ladder", searchQuery: "tv unit cabinet", rooms: ["living"] },
+  { id: "cat-bookshelf", category: "Furniture", name: "Bookshelf", material: "Solid wood", baseCost: 8500, size: [0.35, 1.8, 0.9], shape: "box", color: "#5C3A22", retailer: "Urban Ladder", searchQuery: "bookshelf", rooms: ["living", "bedroom"] },
+  { id: "cat-dining-table", category: "Furniture", name: "Dining Table (4 Seater)", material: "Solid wood", baseCost: 18000, size: [1.2, 0.75, 0.8], shape: "box", color: "#5C3A22", retailer: "Pepperfry", searchQuery: "4 seater dining table", rooms: ["living", "kitchen"] },
+  { id: "cat-chair", category: "Furniture", name: "Dining Chair", material: "Wood + fabric", baseCost: 3500, size: [0.45, 0.9, 0.45], shape: "box", color: "#4A5568", retailer: "Pepperfry", searchQuery: "dining chair", rooms: ["living", "kitchen"] },
+  { id: "cat-stool", category: "Furniture", name: "Bar Stool", material: "Metal + leatherette", baseCost: 3500, size: [0.4, 0.75, 0.4], shape: "cylinder", color: "#3A3A3A", retailer: "Pepperfry", searchQuery: "bar stool", rooms: ["kitchen"] },
+  // Lighting
+  { id: "cat-floor-lamp", category: "Lighting", name: "Tripod Floor Lamp", material: "Wood + fabric shade", baseCost: 4500, size: [0.5, 1.6, 0.5], shape: "lamp", color: "#F1E6C8", retailer: "Amazon", searchQuery: "tripod floor lamp", rooms: ["living", "bedroom"] },
+  { id: "cat-table-lamp", category: "Lighting", name: "Table Lamp", material: "Fabric shade + metal", baseCost: 1800, size: [0.25, 0.45, 0.25], shape: "lamp", color: "#F1E6C8", retailer: "Amazon", searchQuery: "table lamp modern", rooms: ["living", "bedroom"] },
+  { id: "cat-pendant", category: "Lighting", name: "Pendant Light", material: "Metal + glass", baseCost: 5500, size: [0.5, 0.35, 0.5], shape: "lamp", color: "#FFE9A8", retailer: "Amazon", searchQuery: "pendant light modern", rooms: ["living", "bedroom", "kitchen"] },
+  { id: "cat-chandelier", category: "Lighting", name: "Crystal Chandelier", material: "Crystal + brass", baseCost: 18000, size: [0.6, 0.4, 0.6], shape: "lamp", color: "#FFE9A8", retailer: "Amazon", searchQuery: "crystal chandelier", rooms: ["living", "bedroom"] },
+  { id: "cat-wall-sconce", category: "Lighting", name: "Wall Sconce (Pair)", material: "Metal + glass", baseCost: 3200, size: [0.15, 0.3, 0.12], shape: "lamp", color: "#FFE0A3", retailer: "Amazon", searchQuery: "wall sconce pair", rooms: ["living", "bedroom", "bathroom"] },
+  // Decor
+  { id: "cat-rug-small", category: "Decor", name: "Area Rug (Small)", material: "Wool blend", baseCost: 5500, size: [1.4, 0.02, 1.0], shape: "rug", color: "#5C3A22", retailer: "IKEA", searchQuery: "area rug", rooms: ["living", "bedroom"] },
+  { id: "cat-rug-large", category: "Decor", name: "Area Rug (Large)", material: "Wool blend", baseCost: 9500, size: [2.4, 0.02, 1.6], shape: "rug", color: "#3A4A5C", retailer: "IKEA", searchQuery: "large area rug", rooms: ["living", "bedroom"] },
+  { id: "cat-wall-art", category: "Decor", name: "Framed Wall Art", material: "Canvas + frame", baseCost: 3200, size: [0.6, 0.9, 0.04], shape: "frame", color: "#3B82F6", retailer: "Amazon", searchQuery: "framed wall art", rooms: ["living", "bedroom"] },
+  { id: "cat-plant", category: "Decor", name: "Indoor Plant (Pot)", material: "Ceramic pot", baseCost: 1200, size: [0.35, 0.6, 0.35], shape: "cylinder", color: "#2D5A27", retailer: "Amazon", searchQuery: "indoor plant pot", rooms: ["living", "bedroom", "bathroom"] },
+  { id: "cat-plant-tall", category: "Decor", name: "Tall Floor Plant", material: "Ceramic pot", baseCost: 2800, size: [0.45, 1.2, 0.45], shape: "cylinder", color: "#2D5A27", retailer: "Amazon", searchQuery: "tall indoor plant", rooms: ["living", "bedroom"] },
+  { id: "cat-mirror", category: "Decor", name: "Decorative Mirror", material: "Glass + metal frame", baseCost: 4500, size: [0.7, 0.9, 0.04], shape: "frame", color: "#A8C8E0", retailer: "Amazon", searchQuery: "decorative wall mirror", rooms: ["living", "bedroom", "bathroom"] },
+  { id: "cat-cushion-set", category: "Decor", name: "Cushion Set (4 pcs)", material: "Cotton", baseCost: 1800, size: [0.4, 0.15, 0.4], shape: "box", color: "#D4AF37", retailer: "Amazon", searchQuery: "cushion set", rooms: ["living", "bedroom"] },
+  { id: "cat-books", category: "Decor", name: "Decorative Book Stack", material: "Paper + cloth", baseCost: 800, size: [0.25, 0.2, 0.18], shape: "box", color: "#8B4513", retailer: "Amazon", searchQuery: "decorative books", rooms: ["living", "bedroom"] },
+  { id: "cat-vase", category: "Decor", name: "Ceramic Vase", material: "Ceramic", baseCost: 1500, size: [0.2, 0.35, 0.2], shape: "cylinder", color: "#D8D2C7", retailer: "IKEA", searchQuery: "ceramic vase", rooms: ["living", "bedroom"] },
+  { id: "cat-tv", category: "Decor", name: "55-inch Smart TV", material: "LED panel", baseCost: 42000, size: [1.25, 0.72, 0.07], shape: "box", color: "#0A0A0A", retailer: "Amazon", searchQuery: "55 inch smart tv", rooms: ["living", "bedroom"] },
+];
+
+/** Get catalog items filtered by room compatibility */
+export function getCatalogForRoom(room: StudioRoom): CatalogItem[] {
+  return ITEM_CATALOG.filter((c) => c.rooms.includes(room));
+}
+
+/** Create a PlacedItem from a catalog entry at a given position */
+export function createItemFromCatalog(
+  catalog: CatalogItem,
+  pos: [number, number, number],
+  styleMult: number,
+): PlacedItem {
+  const uniqueId = `${catalog.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  return {
+    id: uniqueId,
+    category: catalog.category,
+    name: catalog.name,
+    material: catalog.material,
+    qty: 1,
+    dimensions: `${catalog.size[0].toFixed(1)} × ${catalog.size[1].toFixed(1)} × ${catalog.size[2].toFixed(1)} m`,
+    cost: Math.round(catalog.baseCost * styleMult),
+    buyUrl: `https://www.amazon.in/s?k=${encodeURIComponent(catalog.searchQuery)}`,
+    retailer: catalog.retailer,
+    pos,
+    size: [...catalog.size] as [number, number, number],
+    color: catalog.color,
+    shape: catalog.shape,
+    userAdded: true,
+  };
+}
+
+// ---- MATERIAL OPTIONS -------------------------------------------------------
+
+export interface MaterialOption {
+  id: string;
+  label: string;
+  category: "wall" | "floor" | "furniture";
+  costMult: number;  // multiplier on base cost
+  color: string;     // preview hex
+}
+
+export const MATERIAL_OPTIONS: MaterialOption[] = [
+  // Wall materials
+  { id: "wall-white", label: "White Emulsion", category: "wall", costMult: 1.0, color: "#F4F2EE" },
+  { id: "wall-cream", label: "Warm Cream", category: "wall", costMult: 1.0, color: "#F0E1C0" },
+  { id: "wall-grey", label: "Elegant Grey", category: "wall", costMult: 1.05, color: "#A8A29E" },
+  { id: "wall-charcoal", label: "Charcoal", category: "wall", costMult: 1.1, color: "#1F1B16" },
+  { id: "wall-sage", label: "Sage Green", category: "wall", costMult: 1.05, color: "#8A9A7A" },
+  { id: "wall-navy", label: "Deep Navy", category: "wall", costMult: 1.1, color: "#1A2744" },
+  // Floor materials
+  { id: "floor-tiles", label: "Vitrified Tiles", category: "floor", costMult: 1.0, color: "#D8D2C7" },
+  { id: "floor-wood", label: "Engineered Wood", category: "floor", costMult: 1.3, color: "#9C7A52" },
+  { id: "floor-marble", label: "Italian Marble", category: "floor", costMult: 2.5, color: "#E8E4DD" },
+  { id: "floor-dark-wood", label: "Dark Walnut", category: "floor", costMult: 1.5, color: "#3A2A1F" },
+  { id: "floor-concrete", label: "Polished Concrete", category: "floor", costMult: 0.9, color: "#8A8A8A" },
+  // Furniture materials
+  { id: "furn-fabric", label: "Fabric", category: "furniture", costMult: 1.0, color: "#7A8A9A" },
+  { id: "furn-leather", label: "Leather", category: "furniture", costMult: 1.6, color: "#3A2A22" },
+  { id: "furn-velvet", label: "Velvet", category: "furniture", costMult: 1.4, color: "#5C2A4A" },
+  { id: "furn-wood-light", label: "Light Oak", category: "furniture", costMult: 1.0, color: "#C4A872" },
+  { id: "furn-wood-dark", label: "Dark Walnut", category: "furniture", costMult: 1.2, color: "#3A2A1F" },
+  { id: "furn-metal", label: "Brushed Metal", category: "furniture", costMult: 1.3, color: "#8A8A9A" },
+];
 
 const PALETTES: Record<StudioStyle, { wall: string; floor: string; accent: string; trim: string }> = {
   modern:      { wall: "#E8E4DD", floor: "#9C7A52", accent: "#3B82F6", trim: "#2A2D34" },
@@ -77,7 +210,7 @@ const STYLE_NOTES: Record<StudioStyle, string[]> = {
   traditional: ["Warm wood tones, ornate details", "Rich fabrics, layered rugs", "Classic frames & trims"],
 };
 
-const STYLE_COST_MULT: Record<StudioStyle, number> = {
+export const STYLE_COST_MULT: Record<StudioStyle, number> = {
   minimal: 0.85,
   modern: 1.0,
   traditional: 1.1,
@@ -121,32 +254,40 @@ interface BuildCtx {
   decorBudget: number;
   matBudget: number;
   styleMult: number;
+  rng: () => number;  // seeded rng for variation
 }
 
 function fmt(n: number) { return n.toFixed(1); }
 
 function bedroomItems(c: BuildCtx): PlacedItem[] {
-  const { W, D, H, palette, styleMult } = c;
+  const { W, D, H, palette, styleMult, rng } = c;
   const items: PlacedItem[] = [];
-
+  const bedOffset = jitter(0, W * 0.08, rng); // slight horizontal offset
   // Bed against the back wall, centered
   const bedW = Math.min(2.0, W * 0.55);
   const bedD = 2.05;
   const bedH = 0.55;
-  const bedZ = -D / 2 + bedD / 2 + 0.2;
+  const bedZ = -D / 2 + bedD / 2 + jitter(0.2, 0.1, rng);
+  // Variation: pick bed names from pool
+  const bedNames = c.style === "luxury"
+    ? pick(["King Bed (Velvet Headboard)", "Platform Bed (Tufted)", "Canopy Bed (Brass Frame)"], rng)
+    : pick(["Queen Bed with Storage", "Platform Bed (Minimal)", "Queen Bed (Slatted Base)", "Storage Bed (Hydraulic)"], rng);
+  const bedMat = c.style === "luxury"
+    ? pick(["Velvet + Solid wood", "Leather + Teak", "Walnut + Brass"], rng)
+    : pick(["Engineered wood", "MDF + Laminate", "Sheesham wood"], rng);
   items.push({
     id: "bed",
     category: "Furniture",
-    name: c.style === "luxury" ? "King Bed (Velvet Headboard)" : "Queen Bed with Storage",
-    material: c.style === "luxury" ? "Velvet + Solid wood" : "Engineered wood",
+    name: bedNames,
+    material: bedMat,
     qty: 1,
     dimensions: `${fmt(bedW)} × ${fmt(bedD)} × ${fmt(bedH)} m`,
-    cost: Math.round(28000 * styleMult),
-    retailer: "Pepperfry",
+    cost: Math.round(jitter(28000, 5000, rng) * styleMult),
+    retailer: pick(["Pepperfry", "Urban Ladder", "IKEA"] as PlacedItem["retailer"][], rng),
     buyUrl: buildUrl("Pepperfry", "queen bed hydraulic storage"),
-    pos: [0, bedH / 2, bedZ],
+    pos: [bedOffset, bedH / 2, bedZ],
     size: [bedW, bedH, bedD],
-    color: c.style === "luxury" ? "#5C2A2A" : palette.trim,
+    color: c.style === "luxury" ? pick(["#5C2A2A", "#4A2A3A", "#3A2A4A"], rng) : palette.trim,
     shape: "box",
     alternative: { name: "Standard non-storage bed", saves: 9000, buyUrl: buildUrl("Pepperfry", "queen size bed") },
   });
@@ -295,24 +436,31 @@ function bedroomItems(c: BuildCtx): PlacedItem[] {
 }
 
 function livingItems(c: BuildCtx): PlacedItem[] {
-  const { W, D, H, palette, styleMult } = c;
+  const { W, D, H, palette, styleMult, rng } = c;
   const items: PlacedItem[] = [];
+  const sofaOffset = jitter(0, W * 0.06, rng);
 
-  // Sofa against back wall
-  const sofaW = Math.min(2.4, W * 0.6);
+  // Sofa against back wall — varied names/materials
+  const sofaW = Math.min(jitter(2.4, 0.2, rng), W * 0.6);
+  const sofaName = c.style === "luxury"
+    ? pick(["L-Shape Leather Sofa", "Chesterfield Sofa", "Modular Sectional Sofa"], rng)
+    : pick(["3-Seater Fabric Sofa", "Mid-Century Sofa", "Scandinavian Sofa", "Linen Sofa"], rng);
+  const sofaMat = c.style === "luxury"
+    ? pick(["Leather", "Top-grain Leather", "Italian Leather"], rng)
+    : pick(["Fabric + foam", "Linen blend", "Cotton upholstery"], rng);
   items.push({
     id: "sofa",
     category: "Furniture",
-    name: c.style === "luxury" ? "L-Shape Leather Sofa" : "3-Seater Fabric Sofa",
-    material: c.style === "luxury" ? "Leather" : "Fabric + foam",
+    name: sofaName,
+    material: sofaMat,
     qty: 1,
     dimensions: `${fmt(sofaW)} × 0.9 × 0.95 m`,
-    cost: Math.round((c.style === "luxury" ? 65000 : 28000) * styleMult),
-    retailer: "Pepperfry",
+    cost: Math.round(jitter(c.style === "luxury" ? 65000 : 28000, 6000, rng) * styleMult),
+    retailer: pick(["Pepperfry", "Urban Ladder"] as PlacedItem["retailer"][], rng),
     buyUrl: buildUrl("Pepperfry", c.style === "luxury" ? "L shape leather sofa" : "3 seater fabric sofa"),
-    pos: [0, 0.45, -D / 2 + 0.55],
+    pos: [sofaOffset, 0.45, -D / 2 + jitter(0.55, 0.1, rng)],
     size: [sofaW, 0.9, 0.95],
-    color: c.style === "luxury" ? "#3A2A22" : palette.accent,
+    color: c.style === "luxury" ? pick(["#3A2A22", "#2A2A3A", "#4A3A2A"], rng) : palette.accent,
     shape: "box",
     alternative: { name: "2-seater + armchair combo", saves: 10000, buyUrl: buildUrl("Pepperfry", "2 seater sofa with armchair") },
   });
@@ -703,6 +851,7 @@ function bathroomItems(c: BuildCtx): PlacedItem[] {
 }
 
 function buildItems(input: StudioInput, palette: BuildCtx["palette"]): PlacedItem[] {
+  const rng = seededRandom(input.seed ?? Date.now());
   const ctx: BuildCtx = {
     W: input.width,
     D: input.depth,
@@ -711,6 +860,7 @@ function buildItems(input: StudioInput, palette: BuildCtx["palette"]): PlacedIte
     palette,
     styleMult: STYLE_COST_MULT[input.style],
     furnBudget: 0, lightBudget: 0, decorBudget: 0, matBudget: 0,
+    rng,
   };
   switch (input.room) {
     case "bedroom": return bedroomItems(ctx);
