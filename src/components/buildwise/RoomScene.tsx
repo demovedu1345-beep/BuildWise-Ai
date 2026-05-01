@@ -710,4 +710,4 @@ export const RoomScene = ({ plan, hoveredId, selectedId, onHover, onSelect, nigh
   );
 };
 
-Object.values(MODEL_PATHS).forEach((path) => useGLTF.preload(path));
+// Models are NOT preloaded — they load on demand when user switches to 3D view

@@ -1,15 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Sun, Moon, ExternalLink, ShoppingBag, AlertTriangle, CheckCircle2,
   TrendingDown, IndianRupee, Maximize2, Layers, Lightbulb, Sofa, Palette, X,
-  Expand, Minimize,
+  Expand, Minimize, Image, Box, Loader2,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import {
   generateStudioPlan, fmtINR, StudioRoom, StudioStyle, StudioPriority, StudioInput,
 } from "@/lib/studio";
-import { RoomScene } from "./RoomScene";
+import { RoomImagePreview } from "./RoomImagePreview";
+
+const RoomScene = lazy(() => import("./RoomScene").then((m) => ({ default: m.RoomScene })));
+
+type ViewMode = "image" | "3d";
 
 const ROOMS: { id: StudioRoom; label: string; w: number; d: number }[] = [
   { id: "bedroom", label: "Bedroom", w: 4.0, d: 4.5 },
@@ -48,8 +52,19 @@ export const Studio3D = () => {
   const [night, setNight] = useState(false);
   const [focus, setFocus] = useState(false);
 
+  const [viewMode, setViewMode] = useState<ViewMode>("image");
+  const [is3DLoading, setIs3DLoading] = useState(false);
+
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Detect low-end device
+  const isLowEnd = useMemo(() => {
+    if (typeof navigator === "undefined") return false;
+    const cores = navigator.hardwareConcurrency ?? 4;
+    const mem = (navigator as any).deviceMemory ?? 8;
+    return cores <= 2 || mem <= 2;
+  }, []);
 
   // Lock body scroll while in Focus Mode + ESC to exit
   useEffect(() => {
@@ -259,7 +274,45 @@ export const Studio3D = () => {
               </div>
             )}
 
-            {/* 3D scene — full width, with Focus Mode + sliding right product panel */}
+            {/* View mode toggle */}
+            <div className="flex items-center gap-3">
+              <div className="glass-strong rounded-2xl p-1 flex items-center gap-1">
+                <button
+                  onClick={() => setViewMode("image")}
+                  className={`press flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium transition-all duration-300 ${
+                    viewMode === "image"
+                      ? "bg-primary/15 text-primary border border-primary/40 shadow-[0_0_20px_hsl(210_90%_62%/0.18)]"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Image className="w-3.5 h-3.5" /> Image View
+                </button>
+                <button
+                  onClick={() => {
+                    if (viewMode !== "3d") {
+                      setIs3DLoading(true);
+                      setViewMode("3d");
+                      setTimeout(() => setIs3DLoading(false), 800);
+                    }
+                  }}
+                  className={`press flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium transition-all duration-300 ${
+                    viewMode === "3d"
+                      ? "bg-primary/15 text-primary border border-primary/40 shadow-[0_0_20px_hsl(210_90%_62%/0.18)]"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Box className="w-3.5 h-3.5" /> 3D View
+                </button>
+              </div>
+              {isLowEnd && viewMode === "3d" && (
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                  <AlertTriangle className="w-3 h-3 text-warning" />
+                  Image Mode recommended for this device
+                </p>
+              )}
+            </div>
+
+            {/* Scene — dual mode with Focus Mode + sliding right product panel */}
             <div
               className={
                 focus
@@ -267,25 +320,52 @@ export const Studio3D = () => {
                   : "glass rounded-3xl overflow-hidden border border-border/50 relative aspect-[16/10] lg:min-h-[560px]"
               }
             >
-              <RoomScene
-                plan={plan}
-                hoveredId={hoveredId}
-                selectedId={selectedId}
-                onHover={setHoveredId}
-                onSelect={setSelectedId}
-                night={night}
-              />
+              {/* Image mode */}
+              {viewMode === "image" && (
+                <RoomImagePreview plan={plan} night={night} />
+              )}
 
-              {/* Top-left: live tag (hidden in focus when nothing selected) */}
+              {/* 3D mode — lazy loaded */}
+              {viewMode === "3d" && (
+                <>
+                  {is3DLoading && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+                      <div className="text-center">
+                        <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-3" />
+                        <p className="text-sm text-muted-foreground">Loading interactive 3D…</p>
+                      </div>
+                    </div>
+                  )}
+                  <Suspense fallback={
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+                      <div className="text-center">
+                        <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-3" />
+                        <p className="text-sm text-muted-foreground">Loading interactive 3D…</p>
+                      </div>
+                    </div>
+                  }>
+                    <RoomScene
+                      plan={plan}
+                      hoveredId={hoveredId}
+                      selectedId={selectedId}
+                      onHover={setHoveredId}
+                      onSelect={setSelectedId}
+                      night={night}
+                    />
+                  </Suspense>
+                </>
+              )}
+
+              {/* Top-left: live tag */}
               {!focus && (
-                <div className="absolute top-3 left-3 glass-strong rounded-full px-3 py-1.5 text-[11px] flex items-center gap-2">
+                <div className="absolute top-3 left-3 glass-strong rounded-full px-3 py-1.5 text-[11px] flex items-center gap-2 z-10">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-glow" />
-                  Live · {plan.input.room} · {plan.input.style}
+                  {viewMode === "3d" ? "Live 3D" : "Preview"} · {plan.input.room} · {plan.input.style}
                 </div>
               )}
 
-              {/* Top-right: focus toggle + day/night */}
-              <div className="absolute top-3 right-3 flex items-center gap-2">
+              {/* Top-right: focus toggle + day/night (only in 3D) */}
+              <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
                 <button
                   onClick={() => setNight((v) => !v)}
                   aria-label="Toggle lighting"
@@ -293,36 +373,54 @@ export const Studio3D = () => {
                 >
                   {night ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                 </button>
-                <button
-                  onClick={() => setFocus((v) => !v)}
-                  aria-label="Toggle focus mode"
-                  className="h-9 px-3 rounded-xl glass-strong flex items-center gap-2 text-xs text-foreground/85 hover:text-foreground transition-colors press"
-                >
-                  {focus ? <Minimize className="w-3.5 h-3.5" /> : <Expand className="w-3.5 h-3.5" />}
-                  {focus ? "Exit Focus" : "Focus Mode"}
-                </button>
+                {viewMode === "3d" && (
+                  <button
+                    onClick={() => setFocus((v) => !v)}
+                    aria-label="Toggle focus mode"
+                    className="h-9 px-3 rounded-xl glass-strong flex items-center gap-2 text-xs text-foreground/85 hover:text-foreground transition-colors press"
+                  >
+                    {focus ? <Minimize className="w-3.5 h-3.5" /> : <Expand className="w-3.5 h-3.5" />}
+                    {focus ? "Exit Focus" : "Focus Mode"}
+                  </button>
+                )}
               </div>
 
-              {/* Bottom-left: hover label */}
-              {hoveredId && !selectedId && (
-                <div className="absolute bottom-4 left-4 glass-strong rounded-full px-3 py-1.5 text-xs animate-fade-in">
+              {/* Bottom-left: hover label (3D only) */}
+              {viewMode === "3d" && hoveredId && !selectedId && (
+                <div className="absolute bottom-4 left-4 glass-strong rounded-full px-3 py-1.5 text-xs animate-fade-in z-10">
                   {plan.items.find((i) => i.id === hoveredId)?.name}
                 </div>
               )}
 
               {/* Focus Mode hint */}
-              {focus && !selected && (
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 glass-strong rounded-full px-4 py-2 text-xs text-muted-foreground animate-fade-in">
+              {viewMode === "3d" && focus && !selected && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 glass-strong rounded-full px-4 py-2 text-xs text-muted-foreground animate-fade-in z-10">
                   Drag to orbit · click any object · ESC to exit
                 </div>
               )}
 
-              {/* Sliding right-side product panel */}
-              <ProductPanel
-                item={selected}
-                onClose={() => setSelectedId(null)}
-                inFocus={focus}
-              />
+              {/* Image mode: quick-switch CTA */}
+              {viewMode === "image" && !focus && (
+                <button
+                  onClick={() => {
+                    setIs3DLoading(true);
+                    setViewMode("3d");
+                    setTimeout(() => setIs3DLoading(false), 800);
+                  }}
+                  className="absolute bottom-4 right-4 glass-strong rounded-2xl px-4 py-2.5 text-xs font-medium text-foreground/85 hover:text-foreground flex items-center gap-2 transition-all press z-10 border border-primary/30 hover:border-primary/60"
+                >
+                  <Box className="w-3.5 h-3.5 text-primary" /> Edit in 3D
+                </button>
+              )}
+
+              {/* Sliding right-side product panel (3D only) */}
+              {viewMode === "3d" && (
+                <ProductPanel
+                  item={selected}
+                  onClose={() => setSelectedId(null)}
+                  inFocus={focus}
+                />
+              )}
             </div>
 
             {/* Budget distribution */}
