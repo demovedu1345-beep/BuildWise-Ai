@@ -309,9 +309,25 @@ export const Studio3D = () => {
               </div>
             </div>
 
+            {/* Action buttons */}
+            <div className="space-y-2 border-t border-border/50 pt-4">
+              <button
+                onClick={handleRegenerate}
+                className="press w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-primary/10 border border-primary/30 text-primary text-xs font-medium hover:bg-primary/20 transition-all"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Generate New Design
+              </button>
+              <button
+                onClick={() => setShowAddPanel(true)}
+                className="press w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-accent/10 border border-accent/30 text-accent text-xs font-medium hover:bg-accent/20 transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Item
+              </button>
+            </div>
+
             <div className="text-[11px] text-muted-foreground leading-relaxed border-t border-border/50 pt-4">
               <p className="mb-1 text-foreground/80 font-medium">Tip</p>
-              Drag to orbit · scroll to zoom · click any object to inspect price & buy link.
+              Click any object to edit, move, or delete. Use "Generate New Design" for a unique layout every time.
             </div>
           </div>
 
