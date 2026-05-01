@@ -254,6 +254,7 @@ interface BuildCtx {
   decorBudget: number;
   matBudget: number;
   styleMult: number;
+  rng: () => number;  // seeded rng for variation
 }
 
 function fmt(n: number) { return n.toFixed(1); }
