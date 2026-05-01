@@ -260,9 +260,9 @@ interface BuildCtx {
 function fmt(n: number) { return n.toFixed(1); }
 
 function bedroomItems(c: BuildCtx): PlacedItem[] {
-  const { W, D, H, palette, styleMult } = c;
+  const { W, D, H, palette, styleMult, rng } = c;
   const items: PlacedItem[] = [];
-
+  const bedOffset = jitter(0, W * 0.08, rng); // slight horizontal offset
   // Bed against the back wall, centered
   const bedW = Math.min(2.0, W * 0.55);
   const bedD = 2.05;
