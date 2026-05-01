@@ -837,6 +837,7 @@ function bathroomItems(c: BuildCtx): PlacedItem[] {
 }
 
 function buildItems(input: StudioInput, palette: BuildCtx["palette"]): PlacedItem[] {
+  const rng = seededRandom(input.seed ?? Date.now());
   const ctx: BuildCtx = {
     W: input.width,
     D: input.depth,
@@ -845,6 +846,7 @@ function buildItems(input: StudioInput, palette: BuildCtx["palette"]): PlacedIte
     palette,
     styleMult: STYLE_COST_MULT[input.style],
     furnBudget: 0, lightBudget: 0, decorBudget: 0, matBudget: 0,
+    rng,
   };
   switch (input.room) {
     case "bedroom": return bedroomItems(ctx);
