@@ -674,10 +674,16 @@ const ProductPanel = ({
   item,
   onClose,
   inFocus,
+  onDelete,
+  onRotate,
+  onMove,
 }: {
-  item: ReturnType<typeof generateStudioPlan>["items"][number] | null;
+  item: PlacedItem | null;
   onClose: () => void;
   inFocus: boolean;
+  onDelete: (id: string) => void;
+  onRotate: (id: string) => void;
+  onMove: (id: string, dx: number, dz: number) => void;
 }) => {
   return (
     <AnimatePresence>
@@ -688,7 +694,7 @@ const ProductPanel = ({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: 24, opacity: 0 }}
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          className={`absolute top-0 bottom-0 right-0 w-full sm:w-[380px] glass-strong border-l border-border/50 p-6 flex flex-col z-10 ${
+          className={`absolute top-0 bottom-0 right-0 w-full sm:w-[380px] glass-strong border-l border-border/50 p-6 flex flex-col z-10 overflow-y-auto ${
             inFocus ? "shadow-[0_0_80px_-20px_hsl(210_90%_50%/0.25)]" : ""
           }`}
         >
@@ -697,6 +703,9 @@ const ProductPanel = ({
             <div>
               <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">{item.category}</p>
               <h4 className="font-display text-xl leading-tight mt-1.5">{item.name}</h4>
+              {item.userAdded && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 mt-1.5 inline-block">Custom</span>
+              )}
             </div>
             <button
               onClick={onClose}
@@ -707,9 +716,32 @@ const ProductPanel = ({
             </button>
           </div>
 
+          {/* Edit controls */}
+          <div className="flex items-center gap-2 mb-5">
+            <button
+              onClick={() => onRotate(item.id)}
+              className="press flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-secondary/60 border border-border/50 text-xs text-foreground/80 hover:text-foreground hover:border-primary/30 transition"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Rotate
+            </button>
+            <button
+              onClick={() => onMove(item.id, 0.2, 0)}
+              className="press flex items-center justify-center gap-1 h-9 w-9 rounded-xl bg-secondary/60 border border-border/50 text-xs text-foreground/80 hover:text-foreground hover:border-primary/30 transition"
+              title="Move right"
+            >
+              <Move className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => onDelete(item.id)}
+              className="press flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-destructive/10 border border-destructive/30 text-xs text-destructive/80 hover:text-destructive hover:bg-destructive/20 transition"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Delete
+            </button>
+          </div>
+
           {/* Visual swatch */}
           <div
-            className="relative h-40 rounded-2xl overflow-hidden mb-5 border border-border/40"
+            className="relative h-32 rounded-2xl overflow-hidden mb-5 border border-border/40"
             style={{
               background: `radial-gradient(circle at 30% 30%, ${item.color}, hsl(222 22% 9%) 80%)`,
             }}
@@ -764,3 +796,75 @@ const ProductPanel = ({
     </AnimatePresence>
   );
 };
+
+/**
+ * Add Item panel — category-grouped catalog browser
+ */
+const AddItemPanel = ({
+  catalogByCategory,
+  onAdd,
+  onClose,
+}: {
+  catalogByCategory: Record<string, CatalogItem[]>;
+  onAdd: (cat: CatalogItem) => void;
+  onClose: () => void;
+}) => (
+  <AnimatePresence>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-md"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: 20, opacity: 0, scale: 0.97 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        exit={{ y: 10, opacity: 0, scale: 0.98 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        className="glass-strong rounded-3xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto border border-border/50"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="font-display text-xl">Add Item</h3>
+            <p className="text-xs text-muted-foreground mt-1">Choose an item to place in your room</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg bg-secondary/60 hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition press"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="space-y-5">
+          {Object.entries(catalogByCategory).map(([cat, items]) => (
+            <div key={cat}>
+              <p className="text-[10px] uppercase tracking-wider text-accent mb-2">{cat}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {items.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => onAdd(item)}
+                    className="press text-left p-3 rounded-xl border border-border/50 bg-secondary/30 hover:border-primary/40 hover:bg-primary/5 transition-all group"
+                  >
+                    <div
+                      className="w-full h-12 rounded-lg mb-2 border border-border/30"
+                      style={{
+                        background: `radial-gradient(circle at 40% 40%, ${item.color}44, hsl(222 22% 9%) 80%)`,
+                      }}
+                    />
+                    <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">{item.name}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{item.material}</p>
+                    <p className="text-xs font-display text-foreground/80 mt-1">{fmtINR(item.baseCost)}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
+  </AnimatePresence>
+);
