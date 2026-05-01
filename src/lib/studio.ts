@@ -268,19 +268,26 @@ function bedroomItems(c: BuildCtx): PlacedItem[] {
   const bedD = 2.05;
   const bedH = 0.55;
   const bedZ = -D / 2 + bedD / 2 + jitter(0.2, 0.1, rng);
+  // Variation: pick bed names from pool
+  const bedNames = c.style === "luxury"
+    ? pick(["King Bed (Velvet Headboard)", "Platform Bed (Tufted)", "Canopy Bed (Brass Frame)"], rng)
+    : pick(["Queen Bed with Storage", "Platform Bed (Minimal)", "Queen Bed (Slatted Base)", "Storage Bed (Hydraulic)"], rng);
+  const bedMat = c.style === "luxury"
+    ? pick(["Velvet + Solid wood", "Leather + Teak", "Walnut + Brass"], rng)
+    : pick(["Engineered wood", "MDF + Laminate", "Sheesham wood"], rng);
   items.push({
     id: "bed",
     category: "Furniture",
-    name: c.style === "luxury" ? "King Bed (Velvet Headboard)" : "Queen Bed with Storage",
-    material: c.style === "luxury" ? "Velvet + Solid wood" : "Engineered wood",
+    name: bedNames,
+    material: bedMat,
     qty: 1,
     dimensions: `${fmt(bedW)} × ${fmt(bedD)} × ${fmt(bedH)} m`,
-    cost: Math.round(28000 * styleMult),
-    retailer: "Pepperfry",
+    cost: Math.round(jitter(28000, 5000, rng) * styleMult),
+    retailer: pick(["Pepperfry", "Urban Ladder", "IKEA"] as PlacedItem["retailer"][], rng),
     buyUrl: buildUrl("Pepperfry", "queen bed hydraulic storage"),
-    pos: [0, bedH / 2, bedZ],
+    pos: [bedOffset, bedH / 2, bedZ],
     size: [bedW, bedH, bedD],
-    color: c.style === "luxury" ? "#5C2A2A" : palette.trim,
+    color: c.style === "luxury" ? pick(["#5C2A2A", "#4A2A3A", "#3A2A4A"], rng) : palette.trim,
     shape: "box",
     alternative: { name: "Standard non-storage bed", saves: 9000, buyUrl: buildUrl("Pepperfry", "queen size bed") },
   });
