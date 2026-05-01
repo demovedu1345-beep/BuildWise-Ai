@@ -210,7 +210,7 @@ const STYLE_NOTES: Record<StudioStyle, string[]> = {
   traditional: ["Warm wood tones, ornate details", "Rich fabrics, layered rugs", "Classic frames & trims"],
 };
 
-const STYLE_COST_MULT: Record<StudioStyle, number> = {
+export const STYLE_COST_MULT: Record<StudioStyle, number> = {
   minimal: 0.85,
   modern: 1.0,
   traditional: 1.1,
