@@ -1,13 +1,16 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Sun, Moon, ExternalLink, ShoppingBag, AlertTriangle, CheckCircle2,
   TrendingDown, IndianRupee, Maximize2, Layers, Lightbulb, Sofa, Palette, X,
-  Expand, Minimize, Image, Box, Loader2,
+  Expand, Minimize, Image, Box, Loader2, Plus, RotateCcw, Trash2, Move, RefreshCw,
+  Paintbrush,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import {
   generateStudioPlan, fmtINR, StudioRoom, StudioStyle, StudioPriority, StudioInput,
+  PlacedItem, getCatalogForRoom, createItemFromCatalog, MATERIAL_OPTIONS, STYLE_COST_MULT,
+  CatalogItem,
 } from "@/lib/studio";
 import { RoomImagePreview } from "./RoomImagePreview";
 
