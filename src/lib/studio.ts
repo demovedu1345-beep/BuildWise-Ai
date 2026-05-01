@@ -436,24 +436,31 @@ function bedroomItems(c: BuildCtx): PlacedItem[] {
 }
 
 function livingItems(c: BuildCtx): PlacedItem[] {
-  const { W, D, H, palette, styleMult } = c;
+  const { W, D, H, palette, styleMult, rng } = c;
   const items: PlacedItem[] = [];
+  const sofaOffset = jitter(0, W * 0.06, rng);
 
-  // Sofa against back wall
-  const sofaW = Math.min(2.4, W * 0.6);
+  // Sofa against back wall — varied names/materials
+  const sofaW = Math.min(jitter(2.4, 0.2, rng), W * 0.6);
+  const sofaName = c.style === "luxury"
+    ? pick(["L-Shape Leather Sofa", "Chesterfield Sofa", "Modular Sectional Sofa"], rng)
+    : pick(["3-Seater Fabric Sofa", "Mid-Century Sofa", "Scandinavian Sofa", "Linen Sofa"], rng);
+  const sofaMat = c.style === "luxury"
+    ? pick(["Leather", "Top-grain Leather", "Italian Leather"], rng)
+    : pick(["Fabric + foam", "Linen blend", "Cotton upholstery"], rng);
   items.push({
     id: "sofa",
     category: "Furniture",
-    name: c.style === "luxury" ? "L-Shape Leather Sofa" : "3-Seater Fabric Sofa",
-    material: c.style === "luxury" ? "Leather" : "Fabric + foam",
+    name: sofaName,
+    material: sofaMat,
     qty: 1,
     dimensions: `${fmt(sofaW)} × 0.9 × 0.95 m`,
-    cost: Math.round((c.style === "luxury" ? 65000 : 28000) * styleMult),
-    retailer: "Pepperfry",
+    cost: Math.round(jitter(c.style === "luxury" ? 65000 : 28000, 6000, rng) * styleMult),
+    retailer: pick(["Pepperfry", "Urban Ladder"] as PlacedItem["retailer"][], rng),
     buyUrl: buildUrl("Pepperfry", c.style === "luxury" ? "L shape leather sofa" : "3 seater fabric sofa"),
-    pos: [0, 0.45, -D / 2 + 0.55],
+    pos: [sofaOffset, 0.45, -D / 2 + jitter(0.55, 0.1, rng)],
     size: [sofaW, 0.9, 0.95],
-    color: c.style === "luxury" ? "#3A2A22" : palette.accent,
+    color: c.style === "luxury" ? pick(["#3A2A22", "#2A2A3A", "#4A3A2A"], rng) : palette.accent,
     shape: "box",
     alternative: { name: "2-seater + armchair combo", saves: 10000, buyUrl: buildUrl("Pepperfry", "2 seater sofa with armchair") },
   });
