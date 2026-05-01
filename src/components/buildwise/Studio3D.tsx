@@ -54,12 +54,19 @@ export const Studio3D = () => {
   const [depth, setDepth] = useState(5.5);
   const [night, setNight] = useState(false);
   const [focus, setFocus] = useState(false);
+  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 999999));
 
   const [viewMode, setViewMode] = useState<ViewMode>("image");
   const [is3DLoading, setIs3DLoading] = useState(false);
 
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  const [showEditPanel, setShowEditPanel] = useState(false);
+
+  // User-modified items overlay on top of AI-generated plan
+  const [userItems, setUserItems] = useState<PlacedItem[]>([]);
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
   // Detect low-end device
   const isLowEnd = useMemo(() => {
@@ -84,8 +91,21 @@ export const Studio3D = () => {
   const effW = autoSize ? ROOMS.find((r) => r.id === room)!.w : width;
   const effD = autoSize ? ROOMS.find((r) => r.id === room)!.d : depth;
 
-  const input: StudioInput = { room, style, priority, budget, width: effW, depth: effD, height: 2.7 };
-  const plan = useMemo(() => generateStudioPlan(input), [room, style, priority, budget, effW, effD]);
+  const input: StudioInput = { room, style, priority, budget, width: effW, depth: effD, height: 2.7, seed };
+  const basePlan = useMemo(() => generateStudioPlan(input), [room, style, priority, budget, effW, effD, seed]);
+
+  // Merge user modifications into plan
+  const plan = useMemo(() => {
+    const aiItems = basePlan.items.filter((it) => !deletedIds.has(it.id));
+    const allItems = [...aiItems, ...userItems];
+    const subtotal = allItems.reduce((s, it) => s + it.cost, 0);
+    return {
+      ...basePlan,
+      items: allItems,
+      subtotal,
+      withinBudget: subtotal <= budget,
+    };
+  }, [basePlan, userItems, deletedIds, budget]);
 
   const selected = selectedId ? plan.items.find((i) => i.id === selectedId) ?? null : null;
 
@@ -98,6 +118,71 @@ export const Studio3D = () => {
     });
     return out;
   }, [plan.items]);
+
+  // Catalog items for current room
+  const catalog = useMemo(() => getCatalogForRoom(room), [room]);
+  const catalogByCategory = useMemo(() => {
+    const out: Record<string, CatalogItem[]> = {};
+    catalog.forEach((c) => {
+      out[c.category] ||= [];
+      out[c.category].push(c);
+    });
+    return out;
+  }, [catalog]);
+
+  // Handlers
+  const handleRegenerate = useCallback(() => {
+    setSeed(Math.floor(Math.random() * 999999));
+    setUserItems([]);
+    setDeletedIds(new Set());
+    setSelectedId(null);
+  }, []);
+
+  const handleAddItem = useCallback((cat: CatalogItem) => {
+    const pos: [number, number, number] = [
+      (Math.random() - 0.5) * effW * 0.5,
+      cat.size[1] / 2,
+      (Math.random() - 0.5) * effD * 0.5,
+    ];
+    const item = createItemFromCatalog(cat, pos, STYLE_COST_MULT[style]);
+    setUserItems((prev) => [...prev, item]);
+    setSelectedId(item.id);
+    setShowAddPanel(false);
+  }, [effW, effD, style]);
+
+  const handleDeleteItem = useCallback((id: string) => {
+    // Check if it's a user-added item
+    if (userItems.some((it) => it.id === id)) {
+      setUserItems((prev) => prev.filter((it) => it.id !== id));
+    } else {
+      setDeletedIds((prev) => new Set(prev).add(id));
+    }
+    setSelectedId(null);
+  }, [userItems]);
+
+  const handleRotateItem = useCallback((id: string) => {
+    const updateFn = (items: PlacedItem[]) =>
+      items.map((it) => it.id === id ? { ...it, rot: (it.rot ?? 0) + Math.PI / 4 } : it);
+    if (userItems.some((it) => it.id === id)) {
+      setUserItems(updateFn);
+    }
+    // For AI items, we'd need to clone them to userItems to modify
+  }, [userItems]);
+
+  const handleMoveItem = useCallback((id: string, dx: number, dz: number) => {
+    const updateFn = (items: PlacedItem[]) =>
+      items.map((it) => it.id === id ? { ...it, pos: [it.pos[0] + dx, it.pos[1], it.pos[2] + dz] as [number, number, number] } : it);
+    if (userItems.some((it) => it.id === id)) {
+      setUserItems(updateFn);
+    }
+  }, [userItems]);
+
+  // Reset user modifications when room/style changes
+  useEffect(() => {
+    setUserItems([]);
+    setDeletedIds(new Set());
+    setSelectedId(null);
+  }, [room, style]);
 
   return (
     <section id="studio" className="relative py-20 md:py-28 border-t border-border/50">
