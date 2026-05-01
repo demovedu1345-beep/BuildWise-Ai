@@ -591,17 +591,26 @@ export const Studio3D = () => {
                               {it.material} · {it.dimensions} · Qty {it.qty}{it.unit ? ` ${it.unit}` : ""}
                             </p>
                           </div>
-                          <div className="text-right shrink-0">
-                            <p className="font-display text-base">{fmtINR(it.cost)}</p>
-                            <a
-                              href={it.buyUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-[11px] text-primary inline-flex items-center gap-1 hover:underline"
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="text-right">
+                              <p className="font-display text-base">{fmtINR(it.cost)}</p>
+                              <a
+                                href={it.buyUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[11px] text-primary inline-flex items-center gap-1 hover:underline"
+                              >
+                                Buy <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteItem(it.id); }}
+                              className="w-7 h-7 rounded-lg bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center text-destructive/70 hover:text-destructive transition shrink-0"
+                              aria-label="Delete item"
                             >
-                              Buy <ExternalLink className="w-3 h-3" />
-                            </a>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </button>
                       ))}
