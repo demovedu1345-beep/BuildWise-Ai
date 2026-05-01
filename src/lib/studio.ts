@@ -267,7 +267,7 @@ function bedroomItems(c: BuildCtx): PlacedItem[] {
   const bedW = Math.min(2.0, W * 0.55);
   const bedD = 2.05;
   const bedH = 0.55;
-  const bedZ = -D / 2 + bedD / 2 + 0.2;
+  const bedZ = -D / 2 + bedD / 2 + jitter(0.2, 0.1, rng);
   items.push({
     id: "bed",
     category: "Furniture",
