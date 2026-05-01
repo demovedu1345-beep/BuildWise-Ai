@@ -52,8 +52,19 @@ export const Studio3D = () => {
   const [night, setNight] = useState(false);
   const [focus, setFocus] = useState(false);
 
+  const [viewMode, setViewMode] = useState<ViewMode>("image");
+  const [is3DLoading, setIs3DLoading] = useState(false);
+
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Detect low-end device
+  const isLowEnd = useMemo(() => {
+    if (typeof navigator === "undefined") return false;
+    const cores = navigator.hardwareConcurrency ?? 4;
+    const mem = (navigator as any).deviceMemory ?? 8;
+    return cores <= 2 || mem <= 2;
+  }, []);
 
   // Lock body scroll while in Focus Mode + ESC to exit
   useEffect(() => {
