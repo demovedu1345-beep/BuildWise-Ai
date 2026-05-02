@@ -368,21 +368,34 @@ const FurnitureModel = ({
   onHover: (id: string | null) => void;
   onSelect: (id: string | null) => void;
 }) => {
+  const lod = useLOD(item.pos);
   const gltf = useGLTF(MODEL_PATHS[asset]);
   const highlighted = hovered || selected;
+
+  // High & mid detail share GLTF; LOD only swaps materials (cheap re-clone)
   const scene = useMemo(() => {
+    if (lod >= 2) return null; // low: skip GLTF entirely, render proxy
     const cloned = gltf.scene.clone(true);
     cloned.traverse((node) => {
       if (node instanceof THREE.Mesh) {
-        node.castShadow = true;
-        node.receiveShadow = true;
-        node.material = pickSurfaceMaterial(item, `${node.name} ${(node.material as THREE.Material | undefined)?.name ?? ""}`, materials, highlighted, selected);
+        // Far meshes drop shadow casting/receiving for huge perf win
+        node.castShadow = lod === 0;
+        node.receiveShadow = lod === 0;
+        node.material = pickSurfaceMaterial(
+          item,
+          `${node.name} ${(node.material as THREE.Material | undefined)?.name ?? ""}`,
+          materials,
+          highlighted,
+          selected,
+          lod,
+        );
       }
     });
     return cloned;
-  }, [gltf.scene, item, materials, highlighted, selected]);
+  }, [gltf.scene, item, materials, highlighted, selected, lod]);
 
   const { scale, offset } = useMemo(() => {
+    if (!scene) return { scale: [1, 1, 1] as [number, number, number], offset: [0, 0, 0] as [number, number, number] };
     const box = new THREE.Box3().setFromObject(scene);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
@@ -399,10 +412,22 @@ const FurnitureModel = ({
   const position: [number, number, number] = [item.pos[0], bottomY, item.pos[2]];
   const handlers = useInteractiveHandlers(item, onHover, onSelect);
 
+  // LOD 2 — low-poly proxy box, no textures, no shadows
+  if (lod >= 2 || !scene) {
+    return (
+      <group position={position} rotation={[0, item.rot ?? 0, 0]} {...handlers}>
+        <mesh position={[0, item.size[1] / 2, 0]}>
+          <boxGeometry args={item.size} />
+          <meshLambertMaterial color={item.color} />
+        </mesh>
+      </group>
+    );
+  }
+
   return (
     <group position={position} rotation={[0, item.rot ?? 0, 0]} scale={scale} {...handlers}>
       <primitive object={scene} position={offset} />
-      {asset === "lamp" && (
+      {asset === "lamp" && lod === 0 && (
         <pointLight
           position={[0, Math.max(0.25, item.size[1] * 0.74), 0]}
           intensity={item.id.includes("ceiling") || item.id.includes("pendant") || item.id.includes("ceil") ? 0.55 : 0.85}
@@ -411,6 +436,16 @@ const FurnitureModel = ({
           color="#FFDCA8"
           castShadow
           shadow-mapSize={[768, 768]}
+        />
+      )}
+      {/* Lamps still glow at mid distance, but without shadows or full intensity */}
+      {asset === "lamp" && lod === 1 && (
+        <pointLight
+          position={[0, Math.max(0.25, item.size[1] * 0.74), 0]}
+          intensity={0.45}
+          distance={3.0}
+          decay={2}
+          color="#FFDCA8"
         />
       )}
     </group>
