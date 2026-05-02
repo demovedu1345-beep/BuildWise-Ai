@@ -176,7 +176,7 @@ const makePBR = (pack: TexturePack, options: { roughness?: number; metalness?: n
     envMapIntensity: options.env ?? 0.75,
   });
 
-const cloneMaterial = (material: THREE.Material, highlighted: boolean, selected: boolean) => {
+const cloneMaterial = (material: THREE.Material, highlighted: boolean, selected: boolean, lod: LODLevel = 0) => {
   const cloned = material.clone();
   if ("emissive" in cloned && cloned instanceof THREE.MeshStandardMaterial) {
     cloned.emissive = new THREE.Color(selected ? "#78B8FF" : highlighted ? "#D8B86A" : "#000000");
@@ -184,6 +184,23 @@ const cloneMaterial = (material: THREE.Material, highlighted: boolean, selected:
   }
   if ("envMapIntensity" in cloned && cloned instanceof THREE.MeshStandardMaterial) {
     cloned.envMapIntensity = Math.max(cloned.envMapIntensity, selected ? 1 : 0.7);
+  }
+  // LOD: drop expensive maps at distance
+  if (cloned instanceof THREE.MeshStandardMaterial) {
+    if (lod >= 1) {
+      // Mid: keep base color map, drop normal/roughness/metalness maps
+      cloned.normalMap = null;
+      cloned.roughnessMap = null;
+      cloned.metalnessMap = null;
+      cloned.envMapIntensity *= 0.6;
+      cloned.needsUpdate = true;
+    }
+    if (lod >= 2) {
+      // Low: also drop base color map (use solid color)
+      cloned.map = null;
+      cloned.envMapIntensity *= 0.4;
+      cloned.needsUpdate = true;
+    }
   }
   return cloned;
 };
