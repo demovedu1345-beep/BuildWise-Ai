@@ -562,13 +562,13 @@ const Walls = ({ W, D, H, plan, materials }: { W: number; D: number; H: number; 
       <mesh position={[0, H, 0]} rotation={[Math.PI / 2, 0, 0]} material={ceilingMat} receiveShadow>
         <planeGeometry args={[W, D, 4, 4]} />
       </mesh>
-      <mesh position={[0, H / 2, -D / 2]} material={wallMat} receiveShadow>
+      <mesh position={[0, H / 2, -D / 2]} material={wallMatBack} receiveShadow>
         <planeGeometry args={[W, H, 10, 6]} />
       </mesh>
-      <mesh position={[-W / 2, H / 2, 0]} rotation={[0, Math.PI / 2, 0]} material={sideWallMat} receiveShadow>
+      <mesh position={[-W / 2, H / 2, 0]} rotation={[0, Math.PI / 2, 0]} material={wallMatLeft} receiveShadow>
         <planeGeometry args={[D, H, 10, 6]} />
       </mesh>
-      <mesh position={[W / 2, H / 2, 0]} rotation={[0, -Math.PI / 2, 0]} material={sideWallMat} receiveShadow>
+      <mesh position={[W / 2, H / 2, 0]} rotation={[0, -Math.PI / 2, 0]} material={wallMatRight} receiveShadow>
         <planeGeometry args={[D, H, 10, 6]} />
       </mesh>
 
