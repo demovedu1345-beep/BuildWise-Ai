@@ -306,7 +306,7 @@ const isFixture = (item: PlacedItem) => {
   return token.includes("chimney") || token.includes("hob") || token.includes("counter") || token.includes("shower") || token.includes("wc");
 };
 
-const pickSurfaceMaterial = (item: PlacedItem, meshName: string, materials: MaterialLibrary, highlighted: boolean, selected: boolean) => {
+const pickSurfaceMaterial = (item: PlacedItem, meshName: string, materials: MaterialLibrary, highlighted: boolean, selected: boolean, lod: LODLevel = 0) => {
   const itemText = `${item.id} ${item.name} ${item.material}`.toLowerCase();
   const meshText = meshName.toLowerCase();
 
@@ -320,7 +320,7 @@ const pickSurfaceMaterial = (item: PlacedItem, meshName: string, materials: Mate
   else if (itemText.includes("granite") || itemText.includes("ceramic") || itemText.includes("tile")) key = "tile";
   else if (itemText.includes("luxury") || itemText.includes("walnut")) key = "walnut";
 
-  return cloneMaterial(materials[key], highlighted, selected);
+  return cloneMaterial(materials[key], highlighted, selected, lod);
 };
 
 const useInteractiveHandlers = (item: PlacedItem, onHover: (id: string | null) => void, onSelect: (id: string | null) => void) => ({
