@@ -1,4 +1,4 @@
-import { Canvas, ThreeEvent, useThree } from "@react-three/fiber";
+import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import {
   OrbitControls,
   Environment,
@@ -8,9 +8,37 @@ import {
   useTexture,
 } from "@react-three/drei";
 import { EffectComposer, Bloom, DepthOfField, N8AO, Vignette } from "@react-three/postprocessing";
-import { Suspense, useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { PlacedItem, StudioPlan } from "@/lib/studio";
+
+// ---------------------------------------------------------------------------
+// LOD configuration — distance thresholds (meters) from camera to object
+// ---------------------------------------------------------------------------
+const LOD_NEAR = 4.5;   // < this  => high detail (full PBR + GLTF)
+const LOD_MID  = 9.0;   // < this  => mid detail (GLTF + base map only)
+                        // >= this => low detail (proxy box, no textures)
+const LAMP_LIGHT_MAX_DIST = 7.0; // disable lamp point lights past this distance
+
+type LODLevel = 0 | 1 | 2; // 0 high, 1 mid, 2 low
+
+/** Hook: returns the current LOD level for a world position, throttled. */
+function useLOD(worldPos: [number, number, number]): LODLevel {
+  const { camera } = useThree();
+  const [level, setLevel] = useState<LODLevel>(0);
+  const tmp = useRef(new THREE.Vector3());
+  const tick = useRef(0);
+  useFrame(() => {
+    // Throttle: only re-evaluate every 6 frames (~10×/sec at 60fps)
+    tick.current = (tick.current + 1) % 6;
+    if (tick.current !== 0) return;
+    tmp.current.set(worldPos[0], worldPos[1], worldPos[2]);
+    const dist = camera.position.distanceTo(tmp.current);
+    const next: LODLevel = dist < LOD_NEAR ? 0 : dist < LOD_MID ? 1 : 2;
+    if (next !== level) setLevel(next);
+  });
+  return level;
+}
 
 interface RoomSceneProps {
   plan: StudioPlan;
