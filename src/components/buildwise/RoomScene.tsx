@@ -452,6 +452,60 @@ const FurnitureModel = ({
   );
 };
 
+// Wall LOD thresholds (camera distance to a specific wall, meters)
+const WALL_LOD_NEAR = 5.5;
+const WALL_LOD_MID  = 10.5;
+
+/**
+ * Mutates a wall material in place to drop heavy maps as the camera moves away.
+ * Stores the full map set on the material so we can restore on close approach.
+ */
+function useWallLOD(material: THREE.MeshStandardMaterial | null, worldPos: [number, number, number]) {
+  const { camera } = useThree();
+  const tmp = useRef(new THREE.Vector3());
+  const tick = useRef(0);
+  const currentLevel = useRef<LODLevel>(-1 as LODLevel);
+  const fullMaps = useRef<{ normalMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; metalnessMap: THREE.Texture | null } | null>(null);
+
+  useEffect(() => {
+    if (material && !fullMaps.current) {
+      fullMaps.current = {
+        normalMap: material.normalMap,
+        roughnessMap: material.roughnessMap,
+        metalnessMap: material.metalnessMap,
+      };
+    }
+  }, [material]);
+
+  useFrame(() => {
+    if (!material || !fullMaps.current) return;
+    tick.current = (tick.current + 1) % 8;
+    if (tick.current !== 0) return;
+    tmp.current.set(worldPos[0], worldPos[1], worldPos[2]);
+    const dist = camera.position.distanceTo(tmp.current);
+    const next: LODLevel = dist < WALL_LOD_NEAR ? 0 : dist < WALL_LOD_MID ? 1 : 2;
+    if (next === currentLevel.current) return;
+    currentLevel.current = next;
+    if (next === 0) {
+      // Restore everything
+      material.normalMap = fullMaps.current.normalMap;
+      material.roughnessMap = fullMaps.current.roughnessMap;
+      material.metalnessMap = fullMaps.current.metalnessMap;
+    } else if (next === 1) {
+      // Mid: drop normal & metalness, keep roughness for variety
+      material.normalMap = null;
+      material.metalnessMap = null;
+      material.roughnessMap = fullMaps.current.roughnessMap;
+    } else {
+      // Far: drop all detail maps — base color only
+      material.normalMap = null;
+      material.roughnessMap = null;
+      material.metalnessMap = null;
+    }
+    material.needsUpdate = true;
+  });
+}
+
 const Walls = ({ W, D, H, plan, materials }: { W: number; D: number; H: number; plan: StudioPlan; materials: MaterialLibrary }) => {
   const floorPack = plan.input.room === "bathroom" || plan.input.room === "kitchen" ? materials.textures.tile : plan.input.style === "luxury" ? materials.textures.walnut : materials.textures.oak;
   const wallPack = plan.input.style === "luxury" ? materials.textures.charcoalPlaster : materials.textures.plaster;
@@ -470,7 +524,7 @@ const Walls = ({ W, D, H, plan, materials }: { W: number; D: number; H: number; 
     });
   }, [D, W, floorPack, plan.input.room]);
 
-  const wallMat = useMemo(() => {
+  const wallMatBack = useMemo(() => {
     const rx = Math.max(1.5, W / 1.7);
     const ry = Math.max(1.5, H / 1.2);
     return new THREE.MeshStandardMaterial({
@@ -485,7 +539,16 @@ const Walls = ({ W, D, H, plan, materials }: { W: number; D: number; H: number; 
     });
   }, [H, W, wallPack]);
 
-  const sideWallMat = useMemo(() => wallMat.clone(), [wallMat]);
+  // Independent material clones per wall so LOD can mutate them independently
+  const wallMatLeft = useMemo(() => wallMatBack.clone(), [wallMatBack]);
+  const wallMatRight = useMemo(() => wallMatBack.clone(), [wallMatBack]);
+
+  // Wire up LOD per wall + floor
+  useWallLOD(floorMat, [0, 0, 0]);
+  useWallLOD(wallMatBack, [0, H / 2, -D / 2]);
+  useWallLOD(wallMatLeft, [-W / 2, H / 2, 0]);
+  useWallLOD(wallMatRight, [W / 2, H / 2, 0]);
+
   const ceilingMat = useMemo(() => cloneMaterial(materials.plaster, false, false), [materials.plaster]);
   const trimMat = useMemo(() => cloneMaterial(plan.input.style === "luxury" ? materials.brass : materials.walnut, false, false), [materials, plan.input.style]);
   const glassMat = useMemo(() => cloneMaterial(materials.glass, false, false), [materials.glass]);
