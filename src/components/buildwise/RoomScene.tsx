@@ -1,4 +1,4 @@
-import { Canvas, ThreeEvent, useThree } from "@react-three/fiber";
+import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import {
   OrbitControls,
   Environment,
@@ -8,9 +8,37 @@ import {
   useTexture,
 } from "@react-three/drei";
 import { EffectComposer, Bloom, DepthOfField, N8AO, Vignette } from "@react-three/postprocessing";
-import { Suspense, useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { PlacedItem, StudioPlan } from "@/lib/studio";
+
+// ---------------------------------------------------------------------------
+// LOD configuration — distance thresholds (meters) from camera to object
+// ---------------------------------------------------------------------------
+const LOD_NEAR = 4.5;   // < this  => high detail (full PBR + GLTF)
+const LOD_MID  = 9.0;   // < this  => mid detail (GLTF + base map only)
+                        // >= this => low detail (proxy box, no textures)
+const LAMP_LIGHT_MAX_DIST = 7.0; // disable lamp point lights past this distance
+
+type LODLevel = 0 | 1 | 2; // 0 high, 1 mid, 2 low
+
+/** Hook: returns the current LOD level for a world position, throttled. */
+function useLOD(worldPos: [number, number, number]): LODLevel {
+  const { camera } = useThree();
+  const [level, setLevel] = useState<LODLevel>(0);
+  const tmp = useRef(new THREE.Vector3());
+  const tick = useRef(0);
+  useFrame(() => {
+    // Throttle: only re-evaluate every 6 frames (~10×/sec at 60fps)
+    tick.current = (tick.current + 1) % 6;
+    if (tick.current !== 0) return;
+    tmp.current.set(worldPos[0], worldPos[1], worldPos[2]);
+    const dist = camera.position.distanceTo(tmp.current);
+    const next: LODLevel = dist < LOD_NEAR ? 0 : dist < LOD_MID ? 1 : 2;
+    if (next !== level) setLevel(next);
+  });
+  return level;
+}
 
 interface RoomSceneProps {
   plan: StudioPlan;
@@ -148,7 +176,7 @@ const makePBR = (pack: TexturePack, options: { roughness?: number; metalness?: n
     envMapIntensity: options.env ?? 0.75,
   });
 
-const cloneMaterial = (material: THREE.Material, highlighted: boolean, selected: boolean) => {
+const cloneMaterial = (material: THREE.Material, highlighted: boolean, selected: boolean, lod: LODLevel = 0) => {
   const cloned = material.clone();
   if ("emissive" in cloned && cloned instanceof THREE.MeshStandardMaterial) {
     cloned.emissive = new THREE.Color(selected ? "#78B8FF" : highlighted ? "#D8B86A" : "#000000");
@@ -156,6 +184,23 @@ const cloneMaterial = (material: THREE.Material, highlighted: boolean, selected:
   }
   if ("envMapIntensity" in cloned && cloned instanceof THREE.MeshStandardMaterial) {
     cloned.envMapIntensity = Math.max(cloned.envMapIntensity, selected ? 1 : 0.7);
+  }
+  // LOD: drop expensive maps at distance
+  if (cloned instanceof THREE.MeshStandardMaterial) {
+    if (lod >= 1) {
+      // Mid: keep base color map, drop normal/roughness/metalness maps
+      cloned.normalMap = null;
+      cloned.roughnessMap = null;
+      cloned.metalnessMap = null;
+      cloned.envMapIntensity *= 0.6;
+      cloned.needsUpdate = true;
+    }
+    if (lod >= 2) {
+      // Low: also drop base color map (use solid color)
+      cloned.map = null;
+      cloned.envMapIntensity *= 0.4;
+      cloned.needsUpdate = true;
+    }
   }
   return cloned;
 };
@@ -261,7 +306,7 @@ const isFixture = (item: PlacedItem) => {
   return token.includes("chimney") || token.includes("hob") || token.includes("counter") || token.includes("shower") || token.includes("wc");
 };
 
-const pickSurfaceMaterial = (item: PlacedItem, meshName: string, materials: MaterialLibrary, highlighted: boolean, selected: boolean) => {
+const pickSurfaceMaterial = (item: PlacedItem, meshName: string, materials: MaterialLibrary, highlighted: boolean, selected: boolean, lod: LODLevel = 0) => {
   const itemText = `${item.id} ${item.name} ${item.material}`.toLowerCase();
   const meshText = meshName.toLowerCase();
 
@@ -275,7 +320,7 @@ const pickSurfaceMaterial = (item: PlacedItem, meshName: string, materials: Mate
   else if (itemText.includes("granite") || itemText.includes("ceramic") || itemText.includes("tile")) key = "tile";
   else if (itemText.includes("luxury") || itemText.includes("walnut")) key = "walnut";
 
-  return cloneMaterial(materials[key], highlighted, selected);
+  return cloneMaterial(materials[key], highlighted, selected, lod);
 };
 
 const useInteractiveHandlers = (item: PlacedItem, onHover: (id: string | null) => void, onSelect: (id: string | null) => void) => ({
@@ -323,21 +368,34 @@ const FurnitureModel = ({
   onHover: (id: string | null) => void;
   onSelect: (id: string | null) => void;
 }) => {
+  const lod = useLOD(item.pos);
   const gltf = useGLTF(MODEL_PATHS[asset]);
   const highlighted = hovered || selected;
+
+  // High & mid detail share GLTF; LOD only swaps materials (cheap re-clone)
   const scene = useMemo(() => {
+    if (lod >= 2) return null; // low: skip GLTF entirely, render proxy
     const cloned = gltf.scene.clone(true);
     cloned.traverse((node) => {
       if (node instanceof THREE.Mesh) {
-        node.castShadow = true;
-        node.receiveShadow = true;
-        node.material = pickSurfaceMaterial(item, `${node.name} ${(node.material as THREE.Material | undefined)?.name ?? ""}`, materials, highlighted, selected);
+        // Far meshes drop shadow casting/receiving for huge perf win
+        node.castShadow = lod === 0;
+        node.receiveShadow = lod === 0;
+        node.material = pickSurfaceMaterial(
+          item,
+          `${node.name} ${(node.material as THREE.Material | undefined)?.name ?? ""}`,
+          materials,
+          highlighted,
+          selected,
+          lod,
+        );
       }
     });
     return cloned;
-  }, [gltf.scene, item, materials, highlighted, selected]);
+  }, [gltf.scene, item, materials, highlighted, selected, lod]);
 
   const { scale, offset } = useMemo(() => {
+    if (!scene) return { scale: [1, 1, 1] as [number, number, number], offset: [0, 0, 0] as [number, number, number] };
     const box = new THREE.Box3().setFromObject(scene);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
@@ -354,10 +412,22 @@ const FurnitureModel = ({
   const position: [number, number, number] = [item.pos[0], bottomY, item.pos[2]];
   const handlers = useInteractiveHandlers(item, onHover, onSelect);
 
+  // LOD 2 — low-poly proxy box, no textures, no shadows
+  if (lod >= 2 || !scene) {
+    return (
+      <group position={position} rotation={[0, item.rot ?? 0, 0]} {...handlers}>
+        <mesh position={[0, item.size[1] / 2, 0]}>
+          <boxGeometry args={item.size} />
+          <meshLambertMaterial color={item.color} />
+        </mesh>
+      </group>
+    );
+  }
+
   return (
     <group position={position} rotation={[0, item.rot ?? 0, 0]} scale={scale} {...handlers}>
       <primitive object={scene} position={offset} />
-      {asset === "lamp" && (
+      {asset === "lamp" && lod === 0 && (
         <pointLight
           position={[0, Math.max(0.25, item.size[1] * 0.74), 0]}
           intensity={item.id.includes("ceiling") || item.id.includes("pendant") || item.id.includes("ceil") ? 0.55 : 0.85}
@@ -368,9 +438,73 @@ const FurnitureModel = ({
           shadow-mapSize={[768, 768]}
         />
       )}
+      {/* Lamps still glow at mid distance, but without shadows or full intensity */}
+      {asset === "lamp" && lod === 1 && (
+        <pointLight
+          position={[0, Math.max(0.25, item.size[1] * 0.74), 0]}
+          intensity={0.45}
+          distance={3.0}
+          decay={2}
+          color="#FFDCA8"
+        />
+      )}
     </group>
   );
 };
+
+// Wall LOD thresholds (camera distance to a specific wall, meters)
+const WALL_LOD_NEAR = 5.5;
+const WALL_LOD_MID  = 10.5;
+
+/**
+ * Mutates a wall material in place to drop heavy maps as the camera moves away.
+ * Stores the full map set on the material so we can restore on close approach.
+ */
+function useWallLOD(material: THREE.MeshStandardMaterial | null, worldPos: [number, number, number]) {
+  const { camera } = useThree();
+  const tmp = useRef(new THREE.Vector3());
+  const tick = useRef(0);
+  const currentLevel = useRef<LODLevel>(-1 as LODLevel);
+  const fullMaps = useRef<{ normalMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; metalnessMap: THREE.Texture | null } | null>(null);
+
+  useEffect(() => {
+    if (material && !fullMaps.current) {
+      fullMaps.current = {
+        normalMap: material.normalMap,
+        roughnessMap: material.roughnessMap,
+        metalnessMap: material.metalnessMap,
+      };
+    }
+  }, [material]);
+
+  useFrame(() => {
+    if (!material || !fullMaps.current) return;
+    tick.current = (tick.current + 1) % 8;
+    if (tick.current !== 0) return;
+    tmp.current.set(worldPos[0], worldPos[1], worldPos[2]);
+    const dist = camera.position.distanceTo(tmp.current);
+    const next: LODLevel = dist < WALL_LOD_NEAR ? 0 : dist < WALL_LOD_MID ? 1 : 2;
+    if (next === currentLevel.current) return;
+    currentLevel.current = next;
+    if (next === 0) {
+      // Restore everything
+      material.normalMap = fullMaps.current.normalMap;
+      material.roughnessMap = fullMaps.current.roughnessMap;
+      material.metalnessMap = fullMaps.current.metalnessMap;
+    } else if (next === 1) {
+      // Mid: drop normal & metalness, keep roughness for variety
+      material.normalMap = null;
+      material.metalnessMap = null;
+      material.roughnessMap = fullMaps.current.roughnessMap;
+    } else {
+      // Far: drop all detail maps — base color only
+      material.normalMap = null;
+      material.roughnessMap = null;
+      material.metalnessMap = null;
+    }
+    material.needsUpdate = true;
+  });
+}
 
 const Walls = ({ W, D, H, plan, materials }: { W: number; D: number; H: number; plan: StudioPlan; materials: MaterialLibrary }) => {
   const floorPack = plan.input.room === "bathroom" || plan.input.room === "kitchen" ? materials.textures.tile : plan.input.style === "luxury" ? materials.textures.walnut : materials.textures.oak;
@@ -390,7 +524,7 @@ const Walls = ({ W, D, H, plan, materials }: { W: number; D: number; H: number; 
     });
   }, [D, W, floorPack, plan.input.room]);
 
-  const wallMat = useMemo(() => {
+  const wallMatBack = useMemo(() => {
     const rx = Math.max(1.5, W / 1.7);
     const ry = Math.max(1.5, H / 1.2);
     return new THREE.MeshStandardMaterial({
@@ -405,7 +539,16 @@ const Walls = ({ W, D, H, plan, materials }: { W: number; D: number; H: number; 
     });
   }, [H, W, wallPack]);
 
-  const sideWallMat = useMemo(() => wallMat.clone(), [wallMat]);
+  // Independent material clones per wall so LOD can mutate them independently
+  const wallMatLeft = useMemo(() => wallMatBack.clone(), [wallMatBack]);
+  const wallMatRight = useMemo(() => wallMatBack.clone(), [wallMatBack]);
+
+  // Wire up LOD per wall + floor
+  useWallLOD(floorMat, [0, 0, 0]);
+  useWallLOD(wallMatBack, [0, H / 2, -D / 2]);
+  useWallLOD(wallMatLeft, [-W / 2, H / 2, 0]);
+  useWallLOD(wallMatRight, [W / 2, H / 2, 0]);
+
   const ceilingMat = useMemo(() => cloneMaterial(materials.plaster, false, false), [materials.plaster]);
   const trimMat = useMemo(() => cloneMaterial(plan.input.style === "luxury" ? materials.brass : materials.walnut, false, false), [materials, plan.input.style]);
   const glassMat = useMemo(() => cloneMaterial(materials.glass, false, false), [materials.glass]);
@@ -419,13 +562,13 @@ const Walls = ({ W, D, H, plan, materials }: { W: number; D: number; H: number; 
       <mesh position={[0, H, 0]} rotation={[Math.PI / 2, 0, 0]} material={ceilingMat} receiveShadow>
         <planeGeometry args={[W, D, 4, 4]} />
       </mesh>
-      <mesh position={[0, H / 2, -D / 2]} material={wallMat} receiveShadow>
+      <mesh position={[0, H / 2, -D / 2]} material={wallMatBack} receiveShadow>
         <planeGeometry args={[W, H, 10, 6]} />
       </mesh>
-      <mesh position={[-W / 2, H / 2, 0]} rotation={[0, Math.PI / 2, 0]} material={sideWallMat} receiveShadow>
+      <mesh position={[-W / 2, H / 2, 0]} rotation={[0, Math.PI / 2, 0]} material={wallMatLeft} receiveShadow>
         <planeGeometry args={[D, H, 10, 6]} />
       </mesh>
-      <mesh position={[W / 2, H / 2, 0]} rotation={[0, -Math.PI / 2, 0]} material={sideWallMat} receiveShadow>
+      <mesh position={[W / 2, H / 2, 0]} rotation={[0, -Math.PI / 2, 0]} material={wallMatRight} receiveShadow>
         <planeGeometry args={[D, H, 10, 6]} />
       </mesh>
 
