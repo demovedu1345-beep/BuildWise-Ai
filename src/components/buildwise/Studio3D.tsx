@@ -115,6 +115,32 @@ export const Studio3D = () => {
     [plan, night]
   );
   const [showBlueprint, setShowBlueprint] = useState(false);
+  const [library, setLibrary] = useState<SavedBlueprint[]>(() => loadBlueprintLibrary());
+  const [showLibrary, setShowLibrary] = useState(false);
+
+  // Auto-save every fresh AI-generated blueprint to the library.
+  useEffect(() => {
+    const next = saveBlueprintToLibrary(blueprint, seed);
+    setLibrary(next);
+  }, [blueprint.hash]);
+
+  const handleRestoreBlueprint = useCallback((entry: SavedBlueprint) => {
+    const bp = entry.blueprint;
+    setRoom(bp.room);
+    setStyle(bp.style);
+    setAutoSize(false);
+    setWidth(bp.dimensions.width);
+    setDepth(bp.dimensions.length);
+    setNight(bp.lighting === "night");
+    setUserItems([]);
+    setDeletedIds(new Set());
+    setSeed(entry.seed);
+    setShowLibrary(false);
+  }, []);
+
+  const handleDeleteSaved = useCallback((hash: string) => {
+    setLibrary(deleteBlueprintFromLibrary(hash));
+  }, []);
 
   const selected = selectedId ? plan.items.find((i) => i.id === selectedId) ?? null : null;
 
