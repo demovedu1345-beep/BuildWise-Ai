@@ -422,6 +422,26 @@ export const Studio3D = () => {
                   Image Mode recommended for this device
                 </p>
               )}
+
+              {/* Shared-blueprint sync badge */}
+              <div className="ml-auto flex items-center gap-2">
+                <div
+                  className="glass rounded-full px-3 py-1.5 text-[10px] flex items-center gap-2 border border-primary/30"
+                  title="Image View and 3D View are rendered from the same Room Blueprint JSON"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-glow" />
+                  <span className="uppercase tracking-wider text-muted-foreground">Synced</span>
+                  <span className="font-mono text-primary">#{blueprint.hash}</span>
+                  <span className="text-muted-foreground">· {blueprint.objects.length} objects</span>
+                </div>
+                <button
+                  onClick={() => setShowBlueprint(true)}
+                  className="press glass rounded-full px-3 py-1.5 text-[10px] flex items-center gap-1.5 border border-border/50 hover:border-primary/40 transition"
+                  title="View shared Room Blueprint JSON"
+                >
+                  <Code2 className="w-3 h-3" /> Blueprint JSON
+                </button>
+              </div>
             </div>
 
             {/* Scene — dual mode with Focus Mode + sliding right product panel */}
