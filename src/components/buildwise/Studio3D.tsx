@@ -108,6 +108,13 @@ export const Studio3D = () => {
     };
   }, [basePlan, userItems, deletedIds, budget]);
 
+  // Shared blueprint — single source of truth for both Image + 3D renderers
+  const blueprint = useMemo<RoomBlueprint>(
+    () => toBlueprint(plan, night ? "night" : "day"),
+    [plan, night]
+  );
+  const [showBlueprint, setShowBlueprint] = useState(false);
+
   const selected = selectedId ? plan.items.find((i) => i.id === selectedId) ?? null : null;
 
   // Group items by category for the inventory panel
