@@ -257,6 +257,11 @@ export const RoomImagePreview = ({ plan, night, blueprint }: { plan: StudioPlan;
         <p className="text-[10px] text-muted-foreground mt-0.5">
           {input.width.toFixed(1)} × {input.depth.toFixed(1)} m · {night ? "Night" : "Day"}
         </p>
+        {blueprint && (
+          <p className="text-[9px] text-muted-foreground/80 mt-1 font-mono">
+            Blueprint <span className="text-primary">#{blueprint.hash}</span> · {blueprint.objects.length} objects
+          </p>
+        )}
       </div>
 
       <div className="absolute bottom-4 right-4 glass rounded-full px-3 py-1.5 text-[10px] text-muted-foreground border border-border/40">
