@@ -468,6 +468,13 @@ export const Studio3D = () => {
                 >
                   <Code2 className="w-3 h-3" /> Blueprint JSON
                 </button>
+                <button
+                  onClick={() => setShowLibrary(true)}
+                  className="press glass rounded-full px-3 py-1.5 text-[10px] flex items-center gap-1.5 border border-border/50 hover:border-accent/40 transition"
+                  title="Restore a previously generated layout exactly"
+                >
+                  <Layers className="w-3 h-3" /> Variations · {library.length}
+                </button>
               </div>
             </div>
 
