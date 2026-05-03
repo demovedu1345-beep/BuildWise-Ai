@@ -10,9 +10,10 @@ import { Slider } from "@/components/ui/slider";
 import {
   generateStudioPlan, fmtINR, StudioRoom, StudioStyle, StudioPriority, StudioInput,
   PlacedItem, getCatalogForRoom, createItemFromCatalog, MATERIAL_OPTIONS, STYLE_COST_MULT,
-  CatalogItem,
+  CatalogItem, toBlueprint, blueprintToPrompt, RoomBlueprint,
 } from "@/lib/studio";
 import { RoomImagePreview } from "./RoomImagePreview";
+import { Code2 } from "lucide-react";
 
 const RoomScene = lazy(() => import("./RoomScene").then((m) => ({ default: m.RoomScene })));
 
