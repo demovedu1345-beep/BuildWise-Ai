@@ -11,6 +11,7 @@ import {
   generateStudioPlan, fmtINR, StudioRoom, StudioStyle, StudioPriority, StudioInput,
   PlacedItem, getCatalogForRoom, createItemFromCatalog, MATERIAL_OPTIONS, STYLE_COST_MULT,
   CatalogItem, toBlueprint, blueprintToPrompt, RoomBlueprint,
+  loadBlueprintLibrary, saveBlueprintToLibrary, deleteBlueprintFromLibrary, SavedBlueprint,
 } from "@/lib/studio";
 import { RoomImagePreview } from "./RoomImagePreview";
 import { Code2 } from "lucide-react";
