@@ -1083,6 +1083,116 @@ export function generateStudioPlan(rawInput: StudioInput): StudioPlan {
   };
 }
 
+// ---- ROOM BLUEPRINT --------------------------------------------------------
+// Single source of truth shared by Image Preview AND 3D Scene.
+// Both renderers derive their output from this exact JSON structure.
+
+export interface BlueprintObject {
+  id: string;
+  type: string;          // sofa, bed, table, lamp, rug, frame, plant, etc.
+  category: PlacedItem["category"];
+  position: [number, number, number];   // meters, room center origin
+  size: [number, number, number];       // w, h, d meters
+  rotation: number;                     // degrees
+  color: string;
+  material: string;
+  shape: PlacedItem["shape"];
+}
+
+export interface RoomBlueprint {
+  version: 1;
+  room: StudioRoom;
+  style: StudioStyle;
+  dimensions: { width: number; length: number; height: number };
+  palette: { wall: string; floor: string; accent: string; trim: string };
+  materials: { wall: string; floor: string };
+  lighting: "day" | "night";
+  objects: BlueprintObject[];
+  hash: string;          // deterministic — image + 3D must share the same hash
+}
+
+/** Classify an item to a blueprint type from its name + shape. */
+function classifyType(it: PlacedItem): string {
+  const n = it.name.toLowerCase();
+  if (it.shape === "lamp" || /lamp|sconce|chandelier|pendant/.test(n)) return "lamp";
+  if (it.shape === "rug" || /rug|carpet/.test(n)) return "rug";
+  if (it.shape === "frame" || /frame|art|painting|mirror/.test(n)) return "frame";
+  if (/bed/.test(n)) return "bed";
+  if (/sofa|couch|loveseat/.test(n)) return "sofa";
+  if (/chair|armchair|stool/.test(n)) return "chair";
+  if (/table|desk|nightstand|console/.test(n)) return "table";
+  if (/wardrobe|cabinet|dresser|bookshelf|shelf/.test(n)) return "wardrobe";
+  if (/plant|fern|tree/.test(n)) return "plant";
+  if (/tv/.test(n)) return "tv";
+  return it.shape ?? "box";
+}
+
+function blueprintHash(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(16).padStart(8, "0");
+}
+
+/** Build the RoomBlueprint from a StudioPlan. Both image + 3D must use this. */
+export function toBlueprint(plan: StudioPlan, lighting: "day" | "night" = "day"): RoomBlueprint {
+  const objects: BlueprintObject[] = plan.items.map((it) => ({
+    id: it.id,
+    type: classifyType(it),
+    category: it.category,
+    position: [
+      Math.round(it.pos[0] * 100) / 100,
+      Math.round(it.pos[1] * 100) / 100,
+      Math.round(it.pos[2] * 100) / 100,
+    ],
+    size: [
+      Math.round(it.size[0] * 100) / 100,
+      Math.round(it.size[1] * 100) / 100,
+      Math.round(it.size[2] * 100) / 100,
+    ],
+    rotation: Math.round(((it.rot ?? 0) * 180) / Math.PI),
+    color: it.color,
+    material: it.material,
+    shape: it.shape ?? "box",
+  }));
+
+  const base = {
+    version: 1 as const,
+    room: plan.input.room,
+    style: plan.input.style,
+    dimensions: {
+      width: Math.round(plan.input.width * 100) / 100,
+      length: Math.round(plan.input.depth * 100) / 100,
+      height: Math.round((plan.input.height ?? 2.7) * 100) / 100,
+    },
+    palette: plan.palette,
+    materials: { wall: plan.palette.wall, floor: plan.palette.floor },
+    lighting,
+    objects,
+  };
+
+  const hash = blueprintHash(JSON.stringify(base));
+  return { ...base, hash };
+}
+
+/** Build a photoreal prompt from the blueprint. Drives image generation
+ *  so the rendered image structurally matches what the 3D viewer shows. */
+export function blueprintToPrompt(bp: RoomBlueprint): string {
+  const itemList = bp.objects
+    .filter((o) => o.type !== "frame")
+    .slice(0, 12)
+    .map((o) => `${o.type} (${o.color}) at (${o.position[0]}, ${o.position[2]})`)
+    .join(", ");
+  return [
+    `Ultra realistic ${bp.style} ${bp.room} interior, ${bp.dimensions.width}m x ${bp.dimensions.length}m`,
+    `floor: ${bp.materials.floor}, walls: ${bp.materials.wall}`,
+    `objects: ${itemList}`,
+    bp.lighting === "night"
+      ? "cinematic night lighting, warm lamp glow, soft shadows"
+      : "natural daylight from window, global illumination, soft shadows",
+    "4k, photorealistic, architectural render, isometric front view",
+  ].join(". ");
+}
+
 export function fmtINR(n: number) {
   return n >= 10000000
     ? `₹${(n / 10000000).toFixed(2)} Cr`
