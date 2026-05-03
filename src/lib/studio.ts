@@ -994,9 +994,21 @@ function enforceClearance(items: PlacedItem[], W: number, D: number, corrections
 
 export function generateStudioPlan(rawInput: StudioInput): StudioPlan {
   const corrections: string[] = [];
+  // Apply seeded room-dimension jitter so each generation varies layout naturally.
+  const seedVal = rawInput.seed ?? Date.now();
+  const dimRng = seededRandom(seedVal + 1013);
+  const r = ROOM_DIM_RANGES[rawInput.room];
+  const wJitter = (dimRng() - 0.5) * Math.min(1.2, (r.wMax - r.wMin) * 0.35);
+  const dJitter = (dimRng() - 0.5) * Math.min(1.2, (r.dMax - r.dMin) * 0.35);
+  const jittered: StudioInput = {
+    ...rawInput,
+    width: rawInput.width + wJitter,
+    depth: rawInput.depth + dJitter,
+  };
   // 1. Clamp dimensions to realistic ranges
-  const input = clampRoom(rawInput, corrections);
-  const palette = PALETTES[input.style];
+  const input = clampRoom(jittered, corrections);
+  // Variation: pick a palette from the style's pool based on seed
+  const palette = pickPalette(input.style, seedVal);
 
   // 2. Validate budget against realistic bands — auto-adjust style or warn
   const band = REALISTIC_BUDGET[input.room][input.style];
