@@ -1,12 +1,12 @@
 import { useMemo } from "react";
-import { StudioPlan, PlacedItem } from "@/lib/studio";
+import { StudioPlan, PlacedItem, RoomBlueprint } from "@/lib/studio";
 
 /**
  * Photoreal-style instant preview rendered with SVG.
- * No WebGL, no network — looks like a real isometric room render
- * built directly from the StudioPlan.
+ * Renders directly from the shared RoomBlueprint so the result is
+ * structurally identical to what the 3D Scene shows.
  */
-export const RoomImagePreview = ({ plan, night }: { plan: StudioPlan; night: boolean }) => {
+export const RoomImagePreview = ({ plan, night, blueprint }: { plan: StudioPlan; night: boolean; blueprint?: RoomBlueprint }) => {
   const { palette, input, items } = plan;
 
   const roomLabel = input.room.charAt(0).toUpperCase() + input.room.slice(1);
@@ -257,6 +257,11 @@ export const RoomImagePreview = ({ plan, night }: { plan: StudioPlan; night: boo
         <p className="text-[10px] text-muted-foreground mt-0.5">
           {input.width.toFixed(1)} × {input.depth.toFixed(1)} m · {night ? "Night" : "Day"}
         </p>
+        {blueprint && (
+          <p className="text-[9px] text-muted-foreground/80 mt-1 font-mono">
+            Blueprint <span className="text-primary">#{blueprint.hash}</span> · {blueprint.objects.length} objects
+          </p>
+        )}
       </div>
 
       <div className="absolute bottom-4 right-4 glass rounded-full px-3 py-1.5 text-[10px] text-muted-foreground border border-border/40">
