@@ -682,6 +682,11 @@ export const Studio3D = () => {
           onClose={() => setShowAddPanel(false)}
         />
       )}
+
+      {/* Blueprint JSON inspector */}
+      {showBlueprint && (
+        <BlueprintInspector blueprint={blueprint} onClose={() => setShowBlueprint(false)} />
+      )}
     </section>
   );
 };
