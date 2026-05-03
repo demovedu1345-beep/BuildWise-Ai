@@ -196,11 +196,47 @@ export const MATERIAL_OPTIONS: MaterialOption[] = [
   { id: "furn-metal", label: "Brushed Metal", category: "furniture", costMult: 1.3, color: "#8A8A9A" },
 ];
 
-const PALETTES: Record<StudioStyle, { wall: string; floor: string; accent: string; trim: string }> = {
-  modern:      { wall: "#E8E4DD", floor: "#9C7A52", accent: "#3B82F6", trim: "#2A2D34" },
-  luxury:      { wall: "#1F1B16", floor: "#3A2A1F", accent: "#D4AF37", trim: "#0F0D0A" },
-  minimal:     { wall: "#F4F2EE", floor: "#D8D2C7", accent: "#222222", trim: "#A8A29E" },
-  traditional: { wall: "#F0E1C0", floor: "#7A4A24", accent: "#8B2E2E", trim: "#3E2A18" },
+type Palette = { wall: string; floor: string; accent: string; trim: string };
+
+/** Variation pool — multiple palettes per style. Seed picks one for each generation. */
+const STYLE_PALETTES: Record<StudioStyle, Palette[]> = {
+  modern: [
+    { wall: "#E8E4DD", floor: "#9C7A52", accent: "#3B82F6", trim: "#2A2D34" },
+    { wall: "#EFEBE3", floor: "#7A5A3A", accent: "#10B981", trim: "#1F2937" },
+    { wall: "#DDE6EE", floor: "#A88660", accent: "#F97316", trim: "#374151" },
+    { wall: "#F2EEE5", floor: "#8B6B47", accent: "#8B5CF6", trim: "#111827" },
+  ],
+  luxury: [
+    { wall: "#1F1B16", floor: "#3A2A1F", accent: "#D4AF37", trim: "#0F0D0A" },
+    { wall: "#241C1A", floor: "#2A1A1A", accent: "#C9A95C", trim: "#100808" },
+    { wall: "#1A1F2A", floor: "#2A2218", accent: "#E0B873", trim: "#0A0E16" },
+    { wall: "#2A1F2A", floor: "#3A2A2F", accent: "#B89968", trim: "#100A12" },
+  ],
+  minimal: [
+    { wall: "#F4F2EE", floor: "#D8D2C7", accent: "#222222", trim: "#A8A29E" },
+    { wall: "#FAFAF7", floor: "#E5DDD0", accent: "#1F1F1F", trim: "#9CA3AF" },
+    { wall: "#F0EDE5", floor: "#C9C0B0", accent: "#3F3F3F", trim: "#B8B2A8" },
+    { wall: "#F6F3EC", floor: "#DAD0BE", accent: "#2D2D2D", trim: "#8B8680" },
+  ],
+  traditional: [
+    { wall: "#F0E1C0", floor: "#7A4A24", accent: "#8B2E2E", trim: "#3E2A18" },
+    { wall: "#E8D8B0", floor: "#5C3A22", accent: "#A04040", trim: "#2E1F12" },
+    { wall: "#EFE0BA", floor: "#6B4028", accent: "#7A4A20", trim: "#3A2818" },
+    { wall: "#F2E5C8", floor: "#85522C", accent: "#9A4A20", trim: "#42301A" },
+  ],
+};
+
+function pickPalette(style: StudioStyle, seed: number): Palette {
+  const pool = STYLE_PALETTES[style];
+  const rng = seededRandom(seed + 7919);
+  return pool[Math.floor(rng() * pool.length)];
+}
+
+const PALETTES: Record<StudioStyle, Palette> = {
+  modern: STYLE_PALETTES.modern[0],
+  luxury: STYLE_PALETTES.luxury[0],
+  minimal: STYLE_PALETTES.minimal[0],
+  traditional: STYLE_PALETTES.traditional[0],
 };
 
 const STYLE_NOTES: Record<StudioStyle, string[]> = {
@@ -958,9 +994,21 @@ function enforceClearance(items: PlacedItem[], W: number, D: number, corrections
 
 export function generateStudioPlan(rawInput: StudioInput): StudioPlan {
   const corrections: string[] = [];
+  // Apply seeded room-dimension jitter so each generation varies layout naturally.
+  const seedVal = rawInput.seed ?? Date.now();
+  const dimRng = seededRandom(seedVal + 1013);
+  const r = ROOM_DIM_RANGES[rawInput.room];
+  const wJitter = (dimRng() - 0.5) * Math.min(1.2, (r.wMax - r.wMin) * 0.35);
+  const dJitter = (dimRng() - 0.5) * Math.min(1.2, (r.dMax - r.dMin) * 0.35);
+  const jittered: StudioInput = {
+    ...rawInput,
+    width: rawInput.width + wJitter,
+    depth: rawInput.depth + dJitter,
+  };
   // 1. Clamp dimensions to realistic ranges
-  const input = clampRoom(rawInput, corrections);
-  const palette = PALETTES[input.style];
+  const input = clampRoom(jittered, corrections);
+  // Variation: pick a palette from the style's pool based on seed
+  const palette = pickPalette(input.style, seedVal);
 
   // 2. Validate budget against realistic bands — auto-adjust style or warn
   const band = REALISTIC_BUDGET[input.room][input.style];
@@ -1199,4 +1247,45 @@ export function fmtINR(n: number) {
     : n >= 100000
     ? `₹${(n / 100000).toFixed(1)} L`
     : `₹${Math.round(n).toLocaleString("en-IN")}`;
+}
+
+// ---- BLUEPRINT LIBRARY ------------------------------------------------------
+// Persistent JSON store for every generated blueprint so any past design
+// can be restored exactly. Keyed by hash; capped to last 30 entries.
+
+export interface SavedBlueprint {
+  hash: string;
+  savedAt: number;
+  seed: number;
+  blueprint: RoomBlueprint;
+}
+
+const LIBRARY_KEY = "buildwise.blueprint.library.v1";
+const LIBRARY_MAX = 30;
+
+export function loadBlueprintLibrary(): SavedBlueprint[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LIBRARY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as SavedBlueprint[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+export function saveBlueprintToLibrary(bp: RoomBlueprint, seed: number): SavedBlueprint[] {
+  if (typeof window === "undefined") return [];
+  const lib = loadBlueprintLibrary();
+  if (lib.some((e) => e.hash === bp.hash)) return lib;
+  const entry: SavedBlueprint = { hash: bp.hash, savedAt: Date.now(), seed, blueprint: bp };
+  const next = [entry, ...lib].slice(0, LIBRARY_MAX);
+  try { window.localStorage.setItem(LIBRARY_KEY, JSON.stringify(next)); } catch {}
+  return next;
+}
+
+export function deleteBlueprintFromLibrary(hash: string): SavedBlueprint[] {
+  if (typeof window === "undefined") return [];
+  const next = loadBlueprintLibrary().filter((e) => e.hash !== hash);
+  try { window.localStorage.setItem(LIBRARY_KEY, JSON.stringify(next)); } catch {}
+  return next;
 }

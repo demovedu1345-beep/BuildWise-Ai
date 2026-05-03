@@ -11,6 +11,7 @@ import {
   generateStudioPlan, fmtINR, StudioRoom, StudioStyle, StudioPriority, StudioInput,
   PlacedItem, getCatalogForRoom, createItemFromCatalog, MATERIAL_OPTIONS, STYLE_COST_MULT,
   CatalogItem, toBlueprint, blueprintToPrompt, RoomBlueprint,
+  loadBlueprintLibrary, saveBlueprintToLibrary, deleteBlueprintFromLibrary, SavedBlueprint,
 } from "@/lib/studio";
 import { RoomImagePreview } from "./RoomImagePreview";
 import { Code2 } from "lucide-react";
@@ -114,6 +115,32 @@ export const Studio3D = () => {
     [plan, night]
   );
   const [showBlueprint, setShowBlueprint] = useState(false);
+  const [library, setLibrary] = useState<SavedBlueprint[]>(() => loadBlueprintLibrary());
+  const [showLibrary, setShowLibrary] = useState(false);
+
+  // Auto-save every fresh AI-generated blueprint to the library.
+  useEffect(() => {
+    const next = saveBlueprintToLibrary(blueprint, seed);
+    setLibrary(next);
+  }, [blueprint.hash]);
+
+  const handleRestoreBlueprint = useCallback((entry: SavedBlueprint) => {
+    const bp = entry.blueprint;
+    setRoom(bp.room);
+    setStyle(bp.style);
+    setAutoSize(false);
+    setWidth(bp.dimensions.width);
+    setDepth(bp.dimensions.length);
+    setNight(bp.lighting === "night");
+    setUserItems([]);
+    setDeletedIds(new Set());
+    setSeed(entry.seed);
+    setShowLibrary(false);
+  }, []);
+
+  const handleDeleteSaved = useCallback((hash: string) => {
+    setLibrary(deleteBlueprintFromLibrary(hash));
+  }, []);
 
   const selected = selectedId ? plan.items.find((i) => i.id === selectedId) ?? null : null;
 
@@ -441,6 +468,13 @@ export const Studio3D = () => {
                 >
                   <Code2 className="w-3 h-3" /> Blueprint JSON
                 </button>
+                <button
+                  onClick={() => setShowLibrary(true)}
+                  className="press glass rounded-full px-3 py-1.5 text-[10px] flex items-center gap-1.5 border border-border/50 hover:border-accent/40 transition"
+                  title="Restore a previously generated layout exactly"
+                >
+                  <Layers className="w-3 h-3" /> Variations · {library.length}
+                </button>
               </div>
             </div>
 
@@ -686,6 +720,17 @@ export const Studio3D = () => {
       {/* Blueprint JSON inspector */}
       {showBlueprint && (
         <BlueprintInspector blueprint={blueprint} onClose={() => setShowBlueprint(false)} />
+      )}
+
+      {/* Variations / blueprint library */}
+      {showLibrary && (
+        <BlueprintLibrary
+          library={library}
+          currentHash={blueprint.hash}
+          onRestore={handleRestoreBlueprint}
+          onDelete={handleDeleteSaved}
+          onClose={() => setShowLibrary(false)}
+        />
       )}
     </section>
   );
@@ -988,6 +1033,106 @@ const BlueprintInspector = ({
               </pre>
             </div>
           </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
+const BlueprintLibrary = ({
+  library, currentHash, onRestore, onDelete, onClose,
+}: {
+  library: SavedBlueprint[];
+  currentHash: string;
+  onRestore: (e: SavedBlueprint) => void;
+  onDelete: (hash: string) => void;
+  onClose: () => void;
+}) => {
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-md flex items-center justify-center p-6"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }}
+          transition={{ duration: 0.3 }}
+          onClick={(e) => e.stopPropagation()}
+          className="glass-strong rounded-3xl w-full max-w-3xl max-h-[80vh] overflow-y-auto p-7 border border-border/60"
+        >
+          <div className="flex items-start justify-between mb-5">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.22em] text-accent">Blueprint Library</p>
+              <h3 className="font-display text-2xl mt-1.5">Your design variations</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Every layout is auto-saved as JSON. Restore any past design exactly — same room, same items, same colors.
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg bg-secondary/60 hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition press"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {library.length === 0 ? (
+            <div className="py-16 text-center text-sm text-muted-foreground">
+              No saved variations yet. Click <span className="text-foreground">Generate New Design</span> to start building your library.
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-3">
+              {library.map((entry) => {
+                const bp = entry.blueprint;
+                const isCurrent = entry.hash === currentHash;
+                return (
+                  <div
+                    key={entry.hash}
+                    className={`p-4 rounded-2xl border transition-all ${
+                      isCurrent
+                        ? "border-primary/50 bg-primary/10"
+                        : "border-border/50 bg-secondary/30 hover:border-accent/40"
+                    }`}
+                  >
+                    {/* Mini palette swatch */}
+                    <div className="flex h-8 rounded-lg overflow-hidden mb-3 border border-border/40">
+                      <div className="flex-1" style={{ background: bp.palette.wall }} />
+                      <div className="flex-1" style={{ background: bp.palette.floor }} />
+                      <div className="flex-1" style={{ background: bp.palette.accent }} />
+                      <div className="flex-1" style={{ background: bp.palette.trim }} />
+                    </div>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="font-medium text-sm capitalize">{bp.style} {bp.room}</p>
+                      <span className="font-mono text-[10px] text-primary">#{entry.hash}</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {bp.dimensions.width.toFixed(1)} × {bp.dimensions.length.toFixed(1)} m · {bp.objects.length} objects · {bp.lighting}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Saved {new Date(entry.savedAt).toLocaleString()}
+                    </p>
+                    <div className="flex items-center gap-2 mt-3">
+                      <button
+                        onClick={() => onRestore(entry)}
+                        disabled={isCurrent}
+                        className="press flex-1 h-8 rounded-lg bg-primary/15 border border-primary/30 text-primary text-[11px] font-medium hover:bg-primary/25 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isCurrent ? "Current" : "Restore"}
+                      </button>
+                      <button
+                        onClick={() => onDelete(entry.hash)}
+                        className="w-8 h-8 rounded-lg bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center text-destructive/70 hover:text-destructive transition"
+                        aria-label="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>
