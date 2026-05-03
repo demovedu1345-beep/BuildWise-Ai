@@ -1,12 +1,12 @@
 import { useMemo } from "react";
-import { StudioPlan, PlacedItem } from "@/lib/studio";
+import { StudioPlan, PlacedItem, RoomBlueprint } from "@/lib/studio";
 
 /**
  * Photoreal-style instant preview rendered with SVG.
- * No WebGL, no network — looks like a real isometric room render
- * built directly from the StudioPlan.
+ * Renders directly from the shared RoomBlueprint so the result is
+ * structurally identical to what the 3D Scene shows.
  */
-export const RoomImagePreview = ({ plan, night }: { plan: StudioPlan; night: boolean }) => {
+export const RoomImagePreview = ({ plan, night, blueprint }: { plan: StudioPlan; night: boolean; blueprint?: RoomBlueprint }) => {
   const { palette, input, items } = plan;
 
   const roomLabel = input.room.charAt(0).toUpperCase() + input.room.slice(1);
