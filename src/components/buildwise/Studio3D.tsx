@@ -454,7 +454,7 @@ export const Studio3D = () => {
             >
               {/* Image mode */}
               {viewMode === "image" && (
-                <RoomImagePreview plan={plan} night={night} />
+                <RoomImagePreview plan={plan} night={night} blueprint={blueprint} />
               )}
 
               {/* 3D mode — lazy loaded */}
