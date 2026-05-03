@@ -1248,3 +1248,44 @@ export function fmtINR(n: number) {
     ? `₹${(n / 100000).toFixed(1)} L`
     : `₹${Math.round(n).toLocaleString("en-IN")}`;
 }
+
+// ---- BLUEPRINT LIBRARY ------------------------------------------------------
+// Persistent JSON store for every generated blueprint so any past design
+// can be restored exactly. Keyed by hash; capped to last 30 entries.
+
+export interface SavedBlueprint {
+  hash: string;
+  savedAt: number;
+  seed: number;
+  blueprint: RoomBlueprint;
+}
+
+const LIBRARY_KEY = "buildwise.blueprint.library.v1";
+const LIBRARY_MAX = 30;
+
+export function loadBlueprintLibrary(): SavedBlueprint[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LIBRARY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as SavedBlueprint[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+export function saveBlueprintToLibrary(bp: RoomBlueprint, seed: number): SavedBlueprint[] {
+  if (typeof window === "undefined") return [];
+  const lib = loadBlueprintLibrary();
+  if (lib.some((e) => e.hash === bp.hash)) return lib;
+  const entry: SavedBlueprint = { hash: bp.hash, savedAt: Date.now(), seed, blueprint: bp };
+  const next = [entry, ...lib].slice(0, LIBRARY_MAX);
+  try { window.localStorage.setItem(LIBRARY_KEY, JSON.stringify(next)); } catch {}
+  return next;
+}
+
+export function deleteBlueprintFromLibrary(hash: string): SavedBlueprint[] {
+  if (typeof window === "undefined") return [];
+  const next = loadBlueprintLibrary().filter((e) => e.hash !== hash);
+  try { window.localStorage.setItem(LIBRARY_KEY, JSON.stringify(next)); } catch {}
+  return next;
+}
