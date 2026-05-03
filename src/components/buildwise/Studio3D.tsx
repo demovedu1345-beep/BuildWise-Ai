@@ -913,3 +913,83 @@ const AddItemPanel = ({
     </motion.div>
   </AnimatePresence>
 );
+
+/** Shared Room Blueprint inspector — proves Image + 3D use the same JSON */
+const BlueprintInspector = ({
+  blueprint,
+  onClose,
+}: {
+  blueprint: RoomBlueprint;
+  onClose: () => void;
+}) => {
+  const json = JSON.stringify(blueprint, null, 2);
+  const prompt = blueprintToPrompt(blueprint);
+  const copy = (txt: string) => {
+    navigator.clipboard?.writeText(txt).catch(() => {});
+  };
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ y: 20, opacity: 0, scale: 0.97 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          exit={{ y: 10, opacity: 0, scale: 0.98 }}
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          className="glass-strong rounded-3xl w-full max-w-3xl max-h-[85vh] overflow-hidden border border-border/50 flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between p-5 border-b border-border/40">
+            <div>
+              <h3 className="font-display text-xl flex items-center gap-2">
+                <Code2 className="w-5 h-5 text-primary" /> Room Blueprint
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Single source of truth · shared by Image View &amp; 3D View ·
+                <span className="font-mono text-primary ml-1">#{blueprint.hash}</span>
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg bg-secondary/60 hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition press"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] uppercase tracking-wider text-accent">Photoreal prompt</p>
+                <button
+                  onClick={() => copy(prompt)}
+                  className="press text-[10px] px-2 py-1 rounded-md bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground transition"
+                >Copy</button>
+              </div>
+              <p className="text-xs leading-relaxed p-3 rounded-xl bg-secondary/40 border border-border/40 text-foreground/80">
+                {prompt}
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] uppercase tracking-wider text-accent">Blueprint JSON</p>
+                <button
+                  onClick={() => copy(json)}
+                  className="press text-[10px] px-2 py-1 rounded-md bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground transition"
+                >Copy</button>
+              </div>
+              <pre className="text-[11px] leading-relaxed p-4 rounded-xl bg-background/60 border border-border/40 overflow-x-auto font-mono text-foreground/85">
+{json}
+              </pre>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
