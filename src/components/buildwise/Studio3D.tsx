@@ -721,6 +721,17 @@ export const Studio3D = () => {
       {showBlueprint && (
         <BlueprintInspector blueprint={blueprint} onClose={() => setShowBlueprint(false)} />
       )}
+
+      {/* Variations / blueprint library */}
+      {showLibrary && (
+        <BlueprintLibrary
+          library={library}
+          currentHash={blueprint.hash}
+          onRestore={handleRestoreBlueprint}
+          onDelete={handleDeleteSaved}
+          onClose={() => setShowLibrary(false)}
+        />
+      )}
     </section>
   );
 };
