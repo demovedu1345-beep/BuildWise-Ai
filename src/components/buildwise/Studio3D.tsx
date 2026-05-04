@@ -523,24 +523,24 @@ export const Studio3D = () => {
                 </>
               )}
 
-              {/* Top-left: live tag */}
-              {!focus && (
+              {/* Top-left: live tag (3D only — image mode has its own toolbar) */}
+              {!focus && viewMode === "3d" && (
                 <div className="absolute top-3 left-3 glass-strong rounded-full px-3 py-1.5 text-[11px] flex items-center gap-2 z-10">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-glow" />
-                  {viewMode === "3d" ? "Live 3D" : "Preview"} · {plan.input.room} · {plan.input.style}
+                  Live 3D · {plan.input.room} · {plan.input.style}
                 </div>
               )}
 
               {/* Top-right: focus toggle + day/night (only in 3D) */}
-              <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
-                <button
-                  onClick={() => setNight((v) => !v)}
-                  aria-label="Toggle lighting"
-                  className="w-9 h-9 rounded-xl glass-strong flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors press"
-                >
-                  {night ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                </button>
-                {viewMode === "3d" && (
+              {viewMode === "3d" && (
+                <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
+                  <button
+                    onClick={() => setNight((v) => !v)}
+                    aria-label="Toggle lighting"
+                    className="w-9 h-9 rounded-xl glass-strong flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors press"
+                  >
+                    {night ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                  </button>
                   <button
                     onClick={() => setFocus((v) => !v)}
                     aria-label="Toggle focus mode"
@@ -549,8 +549,8 @@ export const Studio3D = () => {
                     {focus ? <Minimize className="w-3.5 h-3.5" /> : <Expand className="w-3.5 h-3.5" />}
                     {focus ? "Exit Focus" : "Focus Mode"}
                   </button>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Bottom-left: hover label (3D only) */}
               {viewMode === "3d" && hoveredId && !selectedId && (
