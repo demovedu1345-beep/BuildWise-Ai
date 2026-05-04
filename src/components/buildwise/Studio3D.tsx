@@ -487,9 +487,9 @@ export const Studio3D = () => {
                   : "glass rounded-3xl overflow-hidden border border-border/50 relative aspect-[16/10] lg:min-h-[560px]"
               }
             >
-              {/* Image mode */}
+              {/* Image mode — real AI renders, multi-angle, synced to blueprint */}
               {viewMode === "image" && (
-                <RoomImagePreview plan={plan} night={night} blueprint={blueprint} />
+                <AIRoomGallery plan={plan} blueprint={blueprint} night={night} />
               )}
 
               {/* 3D mode — lazy loaded */}
