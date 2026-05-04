@@ -14,6 +14,7 @@ import {
   loadBlueprintLibrary, saveBlueprintToLibrary, deleteBlueprintFromLibrary, SavedBlueprint,
 } from "@/lib/studio";
 import { RoomImagePreview } from "./RoomImagePreview";
+import { AIRoomGallery } from "./AIRoomGallery";
 import { Code2 } from "lucide-react";
 
 const RoomScene = lazy(() => import("./RoomScene").then((m) => ({ default: m.RoomScene })));
