@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { CITIES, GOALS, Goal, fmtINR } from "@/lib/buildwise";
 import { AnimatedGrid } from "./AnimatedGrid";
+import { LocationAutocomplete, LocationValue } from "./LocationAutocomplete";
 
 interface Props {
   budget: number;
@@ -14,6 +15,8 @@ interface Props {
   setPlotSqft: (n: number) => void;
   goal: Goal;
   setGoal: (g: Goal) => void;
+  location: LocationValue;
+  setLocation: (v: LocationValue) => void;
   onGenerate: () => void;
   loading: boolean;
 }
