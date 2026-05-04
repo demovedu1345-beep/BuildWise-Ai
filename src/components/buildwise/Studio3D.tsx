@@ -566,19 +566,7 @@ export const Studio3D = () => {
                 </div>
               )}
 
-              {/* Image mode: quick-switch CTA */}
-              {viewMode === "image" && !focus && (
-                <button
-                  onClick={() => {
-                    setIs3DLoading(true);
-                    setViewMode("3d");
-                    setTimeout(() => setIs3DLoading(false), 800);
-                  }}
-                  className="absolute bottom-4 right-4 glass-strong rounded-2xl px-4 py-2.5 text-xs font-medium text-foreground/85 hover:text-foreground flex items-center gap-2 transition-all press z-10 border border-primary/30 hover:border-primary/60"
-                >
-                  <Box className="w-3.5 h-3.5 text-primary" /> Edit in 3D
-                </button>
-              )}
+              {/* Image mode handles its own UI via AIRoomGallery */}
 
               {/* Sliding right-side product panel (3D only) */}
               {viewMode === "3d" && (
