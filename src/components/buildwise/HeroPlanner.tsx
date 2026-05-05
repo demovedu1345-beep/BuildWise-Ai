@@ -15,8 +15,8 @@ interface Props {
   setPlotSqft: (n: number) => void;
   goal: Goal;
   setGoal: (g: Goal) => void;
-  location: LocationValue;
-  setLocation: (v: LocationValue) => void;
+  location?: LocationValue;
+  setLocation?: (v: LocationValue) => void;
   onGenerate: () => void;
   loading: boolean;
 }
