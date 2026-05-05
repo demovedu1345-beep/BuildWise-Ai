@@ -27,7 +27,7 @@ export const RoomDecorator = () => {
   const [style, setStyle] = useState("modern");
   const [colorTheme, setColorTheme] = useState("warm-neutrals");
   const [budget, setBudget] = useState(150000);
-  const [location, setLocation] = useState<LocationValue>({ display: "", city: "", region: "" });
+  const [location, setLocation] = useState<LocationValue>({ query: "" });
   const [userPrompt, setUserPrompt] = useState("");
   const [quality, setQuality] = useState<"fast" | "pro">("pro");
 
@@ -88,7 +88,7 @@ export const RoomDecorator = () => {
           },
         }),
         supabase.functions.invoke("suggest-products", {
-          body: { analysis, style, roomPurpose, budget, location: location.display, colorTheme: colorLabel, userPrompt },
+          body: { analysis, style, roomPurpose, budget, location: (location.city || location.query), colorTheme: colorLabel, userPrompt },
         }),
       ]);
       if (imgRes.error) throw imgRes.error;
@@ -130,7 +130,7 @@ export const RoomDecorator = () => {
 
   const cost = useMemo(() => {
     const area = analysis ? analysis.dimensions.width * analysis.dimensions.length : 18;
-    return computeCost(products, budget, area, location.display, analysis?.condition ?? "good");
+    return computeCost(products, budget, area, (location.city || location.query), analysis?.condition ?? "good");
   }, [products, budget, location, analysis]);
 
   const reset = () => {
@@ -421,7 +421,7 @@ export const RoomDecorator = () => {
                   <h3 className="font-semibold">Shoppable products ({products.length})</h3>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  Region: {location.display || "India"} · {(cost.regionalMultiplier * 100).toFixed(0)}% pricing
+                  Region: {(location.city || location.query) || "India"} · {(cost.regionalMultiplier * 100).toFixed(0)}% pricing
                 </span>
               </div>
               {productsLoading && (
