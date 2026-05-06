@@ -83,7 +83,10 @@ Deno.serve(async (req) => {
         p.retailer === "Asian Paints" ? `https://www.asianpaints.com/search-results.html?q=${q}` :
         p.retailer === "Nilkamal" ? `https://www.nilkamalfurniture.com/search?q=${q}` :
         `https://www.amazon.in/s?k=${q}`;
-      const imageUrl = `https://source.unsplash.com/600x400/?${encodeURIComponent((p.category + " " + p.name).toLowerCase())}`;
+      // Use a deterministic placeholder image (Unsplash source service was deprecated).
+      // The retailer search page will show the real product photos when the user clicks "Buy".
+      const seed = encodeURIComponent(`${p.brand}-${p.name}-${i}`);
+      const imageUrl = `https://picsum.photos/seed/${seed}/600/400`;
       return { id: `prod-${i}`, ...p, buyUrl, imageUrl };
     });
 

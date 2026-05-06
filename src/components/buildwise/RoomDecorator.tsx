@@ -5,7 +5,7 @@ import {
   ExternalLink, RefreshCw, Image as ImageIcon, Palette, Eye, Crown, Zap, Camera,
   ChevronRight, Trash2, AlertTriangle, PieChart,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeFn } from "@/lib/invokeFn";
 import {
   RoomAnalysis, DecorProduct, computeCost, ROOM_TYPES, STYLES, COLOR_THEMES,
 } from "@/lib/decorator";
@@ -58,9 +58,7 @@ export const RoomDecorator = () => {
     if (images.length === 0) return;
     setAnalyzing(true); setError(null);
     try {
-      const { data, error } = await supabase.functions.invoke("analyze-room", { body: { images, hint } });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      const data = await invokeFn<{ analysis: RoomAnalysis }>("analyze-room", { images, hint });
       setAnalysis(data.analysis);
       setRoomPurpose(data.analysis.room_type === "other" ? "living" : data.analysis.room_type);
       setStep("preferences");
@@ -77,28 +75,22 @@ export const RoomDecorator = () => {
     setRedesignedImage(null); setProducts([]);
     try {
       const colorLabel = COLOR_THEMES.find((c) => c.id === colorTheme)?.label ?? colorTheme;
-      // Run image regen + product suggestion in parallel
-      const [imgRes, prodRes] = await Promise.all([
-        supabase.functions.invoke("redesign-room", {
-          body: {
-            sourceImage: images[0],
-            analysis, style, colorTheme: colorLabel,
-            roomPurpose, budgetTier: budget < 80000 ? "saving" : budget > 300000 ? "premium" : "balanced",
-            userPrompt, quality,
-          },
+      const tier = budget < 80000 ? "saving" : budget > 300000 ? "premium" : "balanced";
+      // Run image regen + product suggestion in parallel; product failure shouldn't kill the image.
+      const [imgSettled, prodSettled] = await Promise.allSettled([
+        invokeFn<{ imageUrl: string }>("redesign-room", {
+          sourceImage: images[0], analysis, style, colorTheme: colorLabel,
+          roomPurpose, budgetTier: tier, userPrompt, quality,
         }),
-        supabase.functions.invoke("suggest-products", {
-          body: { analysis, style, roomPurpose, budget, location: (location.city || location.query), colorTheme: colorLabel, userPrompt },
+        invokeFn<{ products: DecorProduct[] }>("suggest-products", {
+          analysis, style, roomPurpose, budget,
+          location: (location.city || location.query), colorTheme: colorLabel, userPrompt,
         }),
       ]);
-      if (imgRes.error) throw imgRes.error;
-      if (imgRes.data?.error) throw new Error(imgRes.data.error);
-      setRedesignedImage(imgRes.data.imageUrl);
-
-      if (prodRes.error) console.error(prodRes.error);
-      else if (prodRes.data?.error) console.error(prodRes.data.error);
-      else setProducts(prodRes.data.products || []);
-
+      if (imgSettled.status === "rejected") throw imgSettled.reason;
+      setRedesignedImage(imgSettled.value.imageUrl);
+      if (prodSettled.status === "fulfilled") setProducts(prodSettled.value.products || []);
+      else console.error("suggest-products failed:", prodSettled.reason);
       setStep("result");
     } catch (e: any) {
       setError(e?.message ?? "Generation failed");
@@ -113,15 +105,11 @@ export const RoomDecorator = () => {
     setRedesigning(true); setError(null);
     try {
       const colorLabel = COLOR_THEMES.find((c) => c.id === colorTheme)?.label ?? colorTheme;
-      const { data, error } = await supabase.functions.invoke("redesign-room", {
-        body: {
-          sourceImage: images[0], analysis, style, colorTheme: colorLabel,
-          roomPurpose, budgetTier: "balanced", userPrompt, quality,
-          seed: Math.floor(Math.random() * 1e9),
-        },
+      const data = await invokeFn<{ imageUrl: string }>("redesign-room", {
+        sourceImage: images[0], analysis, style, colorTheme: colorLabel,
+        roomPurpose, budgetTier: "balanced", userPrompt, quality,
+        seed: Math.floor(Math.random() * 1e9),
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
       setRedesignedImage(data.imageUrl);
     } catch (e: any) {
       setError(e?.message ?? "Regeneration failed");

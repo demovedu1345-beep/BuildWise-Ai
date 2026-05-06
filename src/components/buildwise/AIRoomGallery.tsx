@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2, RefreshCw, Sparkles, Wand2, Zap, Crown, Image as ImageIcon, AlertTriangle, Maximize2, X,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeFn } from "@/lib/invokeFn";
 import { RoomBlueprint } from "@/lib/studio";
 import { RoomImagePreview } from "./RoomImagePreview";
 import type { StudioPlan } from "@/lib/studio";
@@ -63,25 +63,20 @@ export const AIRoomGallery = ({ plan, blueprint, night }: Props) => {
       setLoading((p) => ({ ...p, [angle]: true }));
       setErrors((p) => ({ ...p, [angle]: null }));
       try {
-        const { data, error } = await supabase.functions.invoke("generate-room-image", {
-          body: {
-            blueprint,
-            angle,
-            quality,
-            userPrompt,
-            seed: force ? Math.floor(Math.random() * 1e9) : undefined,
-          },
+        const data = await invokeFn<{ imageUrl?: string }>("generate-room-image", {
+          blueprint,
+          angle,
+          quality,
+          userPrompt,
+          seed: force ? Math.floor(Math.random() * 1e9) : undefined,
         });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        const url = data?.imageUrl as string | undefined;
+        const url = data?.imageUrl;
         if (!url) throw new Error("No image returned");
         setCache((prev) => ({ ...prev, [key]: { url, hash: blueprint.hash, quality } }));
       } catch (e: any) {
         const msg = e?.message ?? "Failed to generate image";
         setErrors((p) => ({ ...p, [angle]: msg }));
       } finally {
-        inFlight.current.add(key);
         inFlight.current.delete(key);
         setLoading((p) => ({ ...p, [angle]: false }));
       }
