@@ -58,9 +58,7 @@ export const RoomDecorator = () => {
     if (images.length === 0) return;
     setAnalyzing(true); setError(null);
     try {
-      const { data, error } = await supabase.functions.invoke("analyze-room", { body: { images, hint } });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      const data = await invokeFn<{ analysis: RoomAnalysis }>("analyze-room", { images, hint });
       setAnalysis(data.analysis);
       setRoomPurpose(data.analysis.room_type === "other" ? "living" : data.analysis.room_type);
       setStep("preferences");
