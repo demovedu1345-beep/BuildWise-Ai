@@ -5,7 +5,7 @@ import {
   ExternalLink, RefreshCw, Image as ImageIcon, Palette, Eye, Crown, Zap, Camera,
   ChevronRight, Trash2, AlertTriangle, PieChart,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeFn } from "@/lib/invokeFn";
 import {
   RoomAnalysis, DecorProduct, computeCost, ROOM_TYPES, STYLES, COLOR_THEMES,
 } from "@/lib/decorator";
