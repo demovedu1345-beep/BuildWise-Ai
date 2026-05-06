@@ -43,34 +43,56 @@ Deno.serve(async (req) => {
       seed != null ? `Variation seed: ${seed}` : "",
     ].filter(Boolean).join("\n");
 
-    const model = quality === "pro" ? "google/gemini-3-pro-image-preview" : "google/gemini-2.5-flash-image";
+    const primaryModel = quality === "pro"
+      ? "google/gemini-3-pro-image-preview"
+      : "google/gemini-3.1-flash-image-preview";
+    const fallbackModel = "google/gemini-2.5-flash-image";
 
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: sourceImage } },
-          ],
-        }],
-        modalities: ["image", "text"],
-      }),
-    });
+    async function callModel(model: string) {
+      return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: sourceImage } },
+            ],
+          }],
+          modalities: ["image", "text"],
+        }),
+      });
+    }
+
+    let r = await callModel(primaryModel);
+    let usedModel = primaryModel;
+
+    if (r.status === 402) {
+      return new Response(JSON.stringify({ error: "AI credits exhausted. Add credits in Settings → Workspace → Usage." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (r.status === 429) {
+      return new Response(JSON.stringify({ error: "Rate limit reached. Please retry." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (!r.ok && primaryModel !== fallbackModel) {
+      const errText = await r.text().catch(() => "");
+      console.warn("redesign-room primary failed, trying fallback:", r.status, errText);
+      r = await callModel(fallbackModel);
+      usedModel = fallbackModel;
+    }
     if (!r.ok) {
-      const t = await r.text();
+      const t = await r.text().catch(() => "");
       console.error("redesign-room AI error", r.status, t);
-      const status = r.status === 429 || r.status === 402 ? r.status : 500;
-      const error = r.status === 402 ? "AI credits exhausted. Add credits in Settings → Workspace → Usage." : r.status === 429 ? "Rate limit reached. Please retry." : `AI gateway error: ${r.status}`;
-      return new Response(JSON.stringify({ error }), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: `Image model error (${r.status}). Please try again.` }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const data = await r.json();
     const imageUrl = data?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    if (!imageUrl) throw new Error("No image returned");
-    return new Response(JSON.stringify({ imageUrl, model }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!imageUrl) {
+      console.error("redesign-room no image", JSON.stringify(data).slice(0, 500));
+      return new Response(JSON.stringify({ error: "Model returned no image. Try regenerating." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    return new Response(JSON.stringify({ imageUrl, model: usedModel }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     console.error("redesign-room error", e);
     return new Response(JSON.stringify({ error: e?.message ?? "Unknown" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
