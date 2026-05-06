@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2, RefreshCw, Sparkles, Wand2, Zap, Crown, Image as ImageIcon, AlertTriangle, Maximize2, X,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeFn } from "@/lib/invokeFn";
 import { RoomBlueprint } from "@/lib/studio";
 import { RoomImagePreview } from "./RoomImagePreview";
 import type { StudioPlan } from "@/lib/studio";
