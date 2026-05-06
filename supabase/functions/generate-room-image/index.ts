@@ -105,47 +105,64 @@ Deno.serve(async (req) => {
       );
     }
 
-    const model =
+    const primaryModel =
       quality === "pro"
         ? "google/gemini-3-pro-image-preview"
-        : "google/gemini-2.5-flash-image";
+        : "google/gemini-3.1-flash-image-preview";
+    // Fallback chain: if primary fails on a non-billing/non-rate error, try the lighter model.
+    const fallbackModel = "google/gemini-2.5-flash-image";
 
     const prompt = buildPrompt(blueprint, angle, userPrompt) +
       (seed != null ? `\nVariation seed: ${seed}` : "");
 
-    const aiResp = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
+    async function callModel(model: string) {
+      return await fetch(
+        "https://ai.gateway.lovable.dev/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: "user", content: prompt }],
+            modalities: ["image", "text"],
+          }),
         },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: prompt }],
-          modalities: ["image", "text"],
-        }),
-      },
-    );
+      );
+    }
+
+    let aiResp = await callModel(primaryModel);
+    let usedModel = primaryModel;
+
+    // Surface billing/rate-limit errors immediately — fallback won't help.
+    if (aiResp.status === 402) {
+      return new Response(
+        JSON.stringify({ error: "AI credits exhausted. Add credits in Settings → Workspace → Usage." }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (aiResp.status === 429) {
+      return new Response(
+        JSON.stringify({ error: "Rate limit reached. Please wait a few seconds and try again." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Other failure → try fallback model once.
+    if (!aiResp.ok && primaryModel !== fallbackModel) {
+      const errText = await aiResp.text().catch(() => "");
+      console.warn("Primary model failed, trying fallback:", primaryModel, aiResp.status, errText);
+      aiResp = await callModel(fallbackModel);
+      usedModel = fallbackModel;
+    }
 
     if (!aiResp.ok) {
-      const text = await aiResp.text();
+      const text = await aiResp.text().catch(() => "");
       console.error("AI gateway error:", aiResp.status, text);
-      if (aiResp.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit reached. Please wait and try again." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      if (aiResp.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Add credits in Settings → Workspace → Usage." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
       return new Response(
-        JSON.stringify({ error: `AI gateway error: ${aiResp.status}` }),
+        JSON.stringify({ error: `Image model error (${aiResp.status}). Please try again.` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -153,14 +170,15 @@ Deno.serve(async (req) => {
     const data = await aiResp.json();
     const imageUrl = data?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     if (!imageUrl) {
+      console.error("No image in response", JSON.stringify(data).slice(0, 500));
       return new Response(
-        JSON.stringify({ error: "No image returned by AI", raw: data }),
+        JSON.stringify({ error: "Model returned no image. Try regenerating." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     return new Response(
-      JSON.stringify({ imageUrl, model, angle, quality }),
+      JSON.stringify({ imageUrl, model: usedModel, angle, quality }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
